@@ -11,13 +11,13 @@ abstract class Material {
 }
 
 class MirrorMaterial extends Material {
-  final Vector3 baseColor;
+  Vector3 baseColor;
 
   MirrorMaterial(this.baseColor);
 
   Vector3 emission() => Vector3.zero();
 
-  Vector3 transfer(Vector3 incomingDir, Vector3 outgoingDir) => baseColor;
+  Vector3 transfer(Vector3 incomingDir, Vector3 outgoingDir) => baseColor.clone();
 
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
     return reflect(incomingDir, normal);
@@ -31,8 +31,8 @@ class DiffuseMaterial extends Material {
   DiffuseMaterial(this.baseColor);
   DiffuseMaterial.emitter(this.emitLight);
 
-  Vector3 emission() => emitLight;
-  Vector3 transfer(Vector3 incomingDir, Vector3 outgoingDir) => baseColor;
+  Vector3 emission() => emitLight.clone();
+  Vector3 transfer(Vector3 incomingDir, Vector3 outgoingDir) => baseColor.clone();
 
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
     return cosineSampleHemisphere(normal);
