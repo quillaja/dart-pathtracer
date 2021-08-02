@@ -10,17 +10,45 @@ import 'material.dart';
 import 'scene.dart';
 
 void main(List<String> arguments) {
+  const wallRadius = 5000.0;
   var s = Scene([
-    Sphere(Matrix4.identity(), MirrorMaterial(Vector3(0.1, 0.1, 1))),
-    Sphere(Matrix4.translation(Vector3(-1, 0, -2)), MirrorMaterial(Vector3(1, 0.1, 0.1))),
-    Sphere(Matrix4.compose(Vector3(0, 1000 + 10, 0), Quaternion.identity(), Vector3.all(1000)),
-        DiffuseMaterial.emitter(Vector3(1, 1, 1) * 100))
+    // upper ball
+    Sphere(Matrix4.translation(Vector3(0, 0, 1)), MirrorMaterial(Vector3(0.95, 0.95, 0.95))),
+    //lower ball
+    Sphere(Matrix4.translation(Vector3(-1, -2, -2)), DiffuseMaterial(Vector3(0.95, 0.95, 0.95))),
+
+    // large white top light
+    Sphere(
+        Matrix4.compose(
+            Vector3(0, wallRadius + 10, 0), Quaternion.identity(), Vector3.all(wallRadius)),
+        DiffuseMaterial.emitter(Vector3(1, 1, 1) * 5)),
+
+    // Floor (white) -Y
+    Sphere(
+        Matrix4.compose(
+            Vector3(0, -(wallRadius + 3), 0), Quaternion.identity(), Vector3.all(wallRadius)),
+        DiffuseMaterial(Vector3(0.9, 0.9, 0.9))),
+    // Left wall (blueish) +Z
+    Sphere(
+        Matrix4.compose(
+            Vector3(0, 0, wallRadius + 10), Quaternion.identity(), Vector3.all(wallRadius)),
+        DiffuseMaterial(Vector3(0.1, 0.1, 0.95))),
+    // Right wall (reddish) -Z
+    Sphere(
+        Matrix4.compose(
+            Vector3(0, 0, -(wallRadius + 10)), Quaternion.identity(), Vector3.all(wallRadius)),
+        DiffuseMaterial(Vector3(0.95, 0.1, 0.1))),
+    // back wall (greenish) -X
+    Sphere(
+        Matrix4.compose(
+            Vector3(-(wallRadius + 10), 0, 0), Quaternion.identity(), Vector3.all(wallRadius)),
+        DiffuseMaterial(Vector3(0.1, 0.95, 0.1))),
   ]);
 
-  var film = Film(200, 200);
-  var cam = Camera(Vector3(3, 0, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
+  var film = Film(400, 300);
+  var cam = Camera(Vector3(3, 1, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
 
-  render(s, cam, 512);
+  render(s, cam, 16);
 
   var img = film.develop();
   File('image.png').writeAsBytesSync(encodePng(img));
