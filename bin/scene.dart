@@ -34,19 +34,21 @@ void render(Scene s, Camera c, int samplesPerPixel) {
 }
 
 Vector3 trace(Ray r, Scene s) {
-  const maxDepth = 4;
+  const maxDepth = 8;
   final ambient = Vector3.zero(); //(0.1, 0.1, 0.1);
 
+  var workingRay = Ray(r.origin.clone(), r.direction.clone());
   final stack = <Interaction>[];
   for (int d = 0; d < maxDepth; d++) {
-    var h = s.intersect(r);
+    var h = s.intersect(workingRay);
     if (h == Hit.none) break; // early exit
 
     var si = h.object!.surface(h);
     stack.add(si);
+    if (si.mat.emission() != Vector3.zero()) break;
 
-    r.origin = h.point!;
-    r.direction = si.outgoingDir;
+    workingRay.origin = h.point!.clone() + workingRay.direction * 0.001;
+    workingRay.direction = si.outgoingDir.clone();
   }
   // if (stack.length > 0) print(stack.length);
 
@@ -56,7 +58,7 @@ Vector3 trace(Ray r, Scene s) {
     var e = si.mat.emission();
 
     f.multiply(light);
-    light += e + f * dot3(si.outgoingDir, si.normal);
+    light = e + f * dot3(si.outgoingDir, si.normal);
   }
 
   return light;
