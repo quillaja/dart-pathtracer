@@ -45,9 +45,9 @@ void main(List<String> arguments) {
         DiffuseMaterial(Vector3(0.1, 0.95, 0.1))),
   ]);
 
-  const width = 400;
-  const height = 300;
-  const samplesPerPixel = 8;
+  final width = int.parse(arguments[0]);
+  final height = int.parse(arguments[1]);
+  final samplesPerPixel = int.parse(arguments[2]);
 
   var film = Film(width, height);
   var cam = Camera(Vector3(3, 1, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
