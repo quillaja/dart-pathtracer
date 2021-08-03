@@ -32,14 +32,15 @@ class Ray {
 
   Ray transform(Matrix4 tmatrix) {
     return Ray(
+        tmatrix.transformed3(origin),
+        // tmatrix
+        //     .transformed(Vector4.zero()
+        //       ..xyz = origin.xyz.clone()
+        //       ..w = 1)
+        //     .xyz,
         tmatrix
-            .transform(Vector4.zero()
-              ..xyz = origin.xyz
-              ..w = 1)
-            .xyz,
-        tmatrix
-            .transform(Vector4.zero()
-              ..xyz = direction.xyz
+            .transformed(Vector4.zero()
+              ..xyz = direction.xyz.clone()
               ..w = 0)
             .xyz
           ..normalize());
@@ -57,9 +58,9 @@ abstract class Geometry {
 }
 
 class Sphere extends Geometry {
-  final Material mat;
+  Material mat;
 
-  Sphere(Matrix4 modelWorld, this.mat) {
+  Sphere(Matrix4 modelWorld, Material material) : mat = material {
     this.modelWorld = modelWorld;
     this.worldModel = modelWorld.clone()..invert();
   }
@@ -79,14 +80,14 @@ class Sphere extends Geometry {
     final tLocal = (-b - sqrt(discriminant)) / (2.0 * a);
     final pLocal = rLocal.origin + rLocal.direction * tLocal;
     // world hit location
-    final p = modelWorld.transform3(pLocal);
+    final p = modelWorld.transformed3(pLocal);
     final t = dot3((p - r.origin), r.direction);
 
     return Hit(t, r, this);
   }
 
   Interaction surface(Hit h) {
-    final normal = worldModel.transform3(h.point!);
+    final normal = worldModel.transformed3(h.point!).normalized();
     final incomingDir = -h.r!.direction;
     final outgoingDir = mat.getOutgoingDir(incomingDir, normal);
     return Interaction(normal, incomingDir, outgoingDir, mat);
