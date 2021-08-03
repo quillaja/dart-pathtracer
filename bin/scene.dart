@@ -22,10 +22,17 @@ class Scene {
 
 void render(Scene s, Camera c, int samplesPerPixel) {
   var pixels = c.film.pixels();
-  for (var i = 0; i < pixels.length; i++) {
-    final complete = (i.toDouble() / pixels.length.toDouble() * 100.0).toStringAsFixed(1);
-    stdout.write('\r$complete% complete.');
 
+  var renderStart = DateTime.now();
+  for (var i = 0; i < pixels.length; i++) {
+    // status info
+    final complete = (i.toDouble() / pixels.length.toDouble()) * 100.0;
+    final timeTaken = DateTime.now().difference(renderStart);
+    final timeLeft =
+        Duration(microseconds: timeTaken.inMicroseconds ~/ (i + 1) * (pixels.length - i));
+    stdout.write('\r${complete.toStringAsFixed(1)}% complete. Approx time left: $timeLeft.');
+
+    // the work
     final px = pixels[i];
     var accumlatedLight = Vector3.zero();
     for (int i = 0; i < samplesPerPixel; i++) {
