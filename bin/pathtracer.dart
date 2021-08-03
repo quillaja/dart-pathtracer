@@ -45,11 +45,19 @@ void main(List<String> arguments) {
         DiffuseMaterial(Vector3(0.1, 0.95, 0.1))),
   ]);
 
-  var film = Film(400, 300);
+  const width = 400;
+  const height = 300;
+  const samplesPerPixel = 32;
+
+  var film = Film(width, height);
   var cam = Camera(Vector3(3, 1, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
 
-  render(s, cam, 32);
+  final start = DateTime.now();
+  render(s, cam, samplesPerPixel);
+  final took = DateTime.now().difference(start);
+  print('took $took');
 
   var img = film.develop();
+  drawString(img, arial_14, 2, 2, '$width x $height @ $samplesPerPixel spp');
   File('image.png').writeAsBytesSync(encodePng(img));
 }
