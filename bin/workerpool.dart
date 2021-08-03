@@ -32,8 +32,7 @@ class WorkerPool<Job> {
   final ReceivePort _resultPort;
   final WorkFunction _work;
 
-  WorkerPool(int numWorkers, WorkFunction workFunction,
-      [bool stopWhenJobsEmpty = true])
+  WorkerPool(int numWorkers, WorkFunction workFunction, [bool stopWhenJobsEmpty = true])
       : _numWorkers = numWorkers,
         _jobs = 0,
         _stopWhenJobsEmpty = stopWhenJobsEmpty,
@@ -49,8 +48,8 @@ class WorkerPool<Job> {
     // make isolates
     // send them the necessary bits via _isolateData
     for (var i = 0; i < _numWorkers; i++) {
-      var iso = await Isolate.spawn<_isolateData>(_isolateFunction,
-          _isolateData(queuePort.sendPort, _work, _resultPort.sendPort));
+      var iso = await Isolate.spawn<_isolateData>(
+          _isolateFunction, _isolateData(queuePort.sendPort, _work, _resultPort.sendPort));
       _workers.add(iso);
     }
     // get a port from each isolate
@@ -67,6 +66,7 @@ class WorkerPool<Job> {
   int get jobs => _jobs;
 
   /// Add a job to the work queue(s).
+  /// Must be called after start().
   void add(Job work) {
     var workerIndex = _jobs % _numWorkers;
     _jobs++;

@@ -13,8 +13,8 @@ void main(List<String> arguments) {
   const wallRadius = 5000.0;
   var s = Scene([
     // upper ball
-    Sphere(Matrix4.translation(Vector3(0, 0, 1)), MirrorMaterial(Vector3(0.95, 0.95, 0.95))),
-    //lower ball
+    Sphere(Matrix4.translation(Vector3(-1, -1, 1)), MirrorMaterial(Vector3(0.95, 0.95, 0.95))),
+    // lower ball
     Sphere(Matrix4.translation(Vector3(-1, -2, -2)), DiffuseMaterial(Vector3(0.95, 0.95, 0.95))),
 
     // large white top light
@@ -47,7 +47,7 @@ void main(List<String> arguments) {
 
   const width = 400;
   const height = 300;
-  const samplesPerPixel = 32;
+  const samplesPerPixel = 8;
 
   var film = Film(width, height);
   var cam = Camera(Vector3(3, 1, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);

@@ -21,12 +21,11 @@ class Scene {
 }
 
 void render(Scene s, Camera c, int samplesPerPixel) {
-  // const samplesPerPixel = 8;
-
   var pixels = c.film.pixels();
   for (var i = 0; i < pixels.length; i++) {
     final complete = (i.toDouble() / pixels.length.toDouble() * 100.0).toStringAsFixed(1);
     stdout.write('\r$complete% complete.');
+
     final px = pixels[i];
     var accumlatedLight = Vector3.zero();
     for (int i = 0; i < samplesPerPixel; i++) {
@@ -38,7 +37,6 @@ void render(Scene s, Camera c, int samplesPerPixel) {
       var r = c.getRay(jitterpx);
       accumlatedLight += trace(r, s);
     }
-    if (accumlatedLight.isNaN) print('nan light $accumlatedLight');
     accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
     c.film.setAt(px.x.toInt(), px.y.toInt(), accumlatedLight);
   }
@@ -49,7 +47,7 @@ Vector3 trace(Ray r, Scene s) {
   const maxDepth = 8;
   final ambient = Vector3.zero(); //(0.1, 0.1, 0.1);
 
-  var workingRay = Ray(r.origin.clone(), r.direction.clone());
+  var workingRay = r.clone();
   final stack = <Interaction>[];
   for (int d = 0; d < maxDepth; d++) {
     var h = s.intersect(workingRay);
@@ -69,6 +67,7 @@ Vector3 trace(Ray r, Scene s) {
     var f = si.mat.transfer(si.incomingDir, si.normal, si.outgoingDir);
     var e = si.mat.emission();
 
+    // light transport equation: Lo = Le + ∫ f(p,wo,wi)* Li(p,wi) * cos(Θi) dw
     f.multiply(light);
     light = e + f * dot3(si.outgoingDir, si.normal);
   }

@@ -45,6 +45,8 @@ class Ray {
             .xyz
           ..normalize());
   }
+
+  Ray clone() => Ray(origin.clone(), direction.clone());
 }
 
 abstract class Geometry {
