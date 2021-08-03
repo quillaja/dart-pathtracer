@@ -4,7 +4,7 @@ import 'dart:math';
 abstract class Material {
   Vector3 emission();
   // eg on 'diffuse' materials, will return the 'base color'
-  Vector3 transfer(Vector3 incomingDir, Vector3 outgoingDir);
+  Vector3 transfer(Vector3 incomingDir, Vector3 normal, Vector3 outgoingDir);
   // eg on 'diffuse' materials, will return a random direction on the hemisphere,
   // for specular, will produce 'mirror' reflection, etc.
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal);
@@ -17,7 +17,8 @@ class MirrorMaterial extends Material {
 
   Vector3 emission() => Vector3.zero();
 
-  Vector3 transfer(Vector3 incomingDir, Vector3 outgoingDir) => baseColor.clone();
+  Vector3 transfer(Vector3 incomingDir, Vector3 normal, Vector3 outgoingDir) =>
+      baseColor.clone() / dot3(outgoingDir, normal);
 
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
     return reflect(incomingDir, normal);
@@ -32,7 +33,7 @@ class DiffuseMaterial extends Material {
   DiffuseMaterial.emitter(this.emitLight);
 
   Vector3 emission() => emitLight.clone();
-  Vector3 transfer(Vector3 incomingDir, Vector3 outgoingDir) => baseColor.clone();
+  Vector3 transfer(Vector3 incomingDir, Vector3 normal, Vector3 outgoingDir) => baseColor.clone();
 
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
     return cosineSampleHemisphere(normal);
