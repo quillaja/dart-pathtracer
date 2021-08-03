@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:math';
+
 import 'camera.dart';
 import 'geometry.dart';
 import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
@@ -21,16 +24,25 @@ void render(Scene s, Camera c, int samplesPerPixel) {
   // const samplesPerPixel = 8;
 
   var pixels = c.film.pixels();
-  for (var px in pixels) {
-    var r = c.getRay(px);
+  for (var i = 0; i < pixels.length; i++) {
+    final complete = (i.toDouble() / pixels.length.toDouble() * 100.0).toStringAsFixed(1);
+    stdout.write('\r$complete% complete.');
+    final px = pixels[i];
     var accumlatedLight = Vector3.zero();
     for (int i = 0; i < samplesPerPixel; i++) {
+      // jitter in ray origin
+      final dx = Random().nextDouble() - 0.5;
+      final dy = Random().nextDouble() - 0.5;
+      final jitterpx = Vector2(px.x + dx, px.y + dy);
+      // get ray and trace
+      var r = c.getRay(jitterpx);
       accumlatedLight += trace(r, s);
     }
     if (accumlatedLight.isNaN) print('nan light $accumlatedLight');
     accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
     c.film.setAt(px.x.toInt(), px.y.toInt(), accumlatedLight);
   }
+  print('');
 }
 
 Vector3 trace(Ray r, Scene s) {
@@ -54,7 +66,7 @@ Vector3 trace(Ray r, Scene s) {
 
   var light = ambient.clone();
   for (var si in stack.reversed) {
-    var f = si.mat.transfer(si.incomingDir, si.outgoingDir);
+    var f = si.mat.transfer(si.incomingDir, si.normal, si.outgoingDir);
     var e = si.mat.emission();
 
     f.multiply(light);
