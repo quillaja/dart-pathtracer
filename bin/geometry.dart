@@ -20,8 +20,9 @@ class Interaction {
   Vector3 incomingDir;
   Vector3 outgoingDir;
   Material mat;
+  Vector2 texCoords;
 
-  Interaction(this.normal, this.incomingDir, this.outgoingDir, this.mat);
+  Interaction(this.normal, this.incomingDir, this.outgoingDir, this.mat, this.texCoords);
 }
 
 class Ray {
@@ -30,23 +31,14 @@ class Ray {
 
   Ray(this.origin, this.direction);
 
-  Ray transform(Matrix4 tmatrix) {
-    return Ray(
-        tmatrix.transformed3(origin),
-        // tmatrix
-        //     .transformed(Vector4.zero()
-        //       ..xyz = origin.xyz.clone()
-        //       ..w = 1)
-        //     .xyz,
-        tmatrix
-            .transformed(Vector4.zero()
-              ..xyz = direction.xyz.clone()
-              ..w = 0)
-            .xyz
-          ..normalize());
-  }
+  Ray transform(Matrix4 tmatrix) =>
+      Ray(tmatrix.transformed3(origin), transformDirection(tmatrix, direction));
 
   Ray clone() => Ray(origin.clone(), direction.clone());
+}
+
+Vector3 transformDirection(Matrix4 mat, Vector3 dir) {
+  return mat.transformed(Vector4(dir.x, dir.y, dir.z, 0)).xyz..normalize();
 }
 
 abstract class Geometry {
@@ -89,9 +81,15 @@ class Sphere extends Geometry {
   }
 
   Interaction surface(Hit h) {
-    final normal = worldModel.transformed3(h.point!).normalized();
+    // normal
+    final localNormal = worldModel.transformed3(h.point!).normalized();
+    final worldNormal = transformDirection(modelWorld, localNormal);
+    // texture coords (cylindrical)
+    final u = atan2(localNormal.x, localNormal.z) / (2 * pi) + 0.5;
+    final v = localNormal.y * 0.5 + 0.5;
+    // ray directions
     final incomingDir = -h.r!.direction;
-    final outgoingDir = mat.getOutgoingDir(incomingDir, normal);
-    return Interaction(normal, incomingDir, outgoingDir, mat);
+    final outgoingDir = mat.getOutgoingDir(incomingDir, worldNormal);
+    return Interaction(worldNormal, incomingDir, outgoingDir, mat, Vector2(u, v));
   }
 }
