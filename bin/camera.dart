@@ -38,8 +38,8 @@ class Film {
 
   Image develop() {
     final img = Image(width, height);
-    final extremes = _extrema();
-    print(extremes);
+    // final extremes = _extrema();
+    // print(extremes);
 
     for (int y = 0; y < img.height; y++)
       for (int x = 0; x < img.width; x++) {

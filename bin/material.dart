@@ -1,10 +1,12 @@
 import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
 import 'dart:math';
 
+import 'geometry.dart';
+
 abstract class Material {
   Vector3 emission();
   // eg on 'diffuse' materials, will return the 'base color'
-  Vector3 transfer(Vector3 incomingDir, Vector3 normal, Vector3 outgoingDir);
+  Vector3 transfer(Interaction si);
   // eg on 'diffuse' materials, will return a random direction on the hemisphere,
   // for specular, will produce 'mirror' reflection, etc.
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal);
@@ -17,8 +19,7 @@ class MirrorMaterial extends Material {
 
   Vector3 emission() => Vector3.zero();
 
-  Vector3 transfer(Vector3 incomingDir, Vector3 normal, Vector3 outgoingDir) =>
-      baseColor.clone() / dot3(outgoingDir, normal);
+  Vector3 transfer(Interaction si) => baseColor.clone() / dot3(si.outgoingDir, si.normal);
 
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
     return reflect(incomingDir, normal);
@@ -28,15 +29,42 @@ class MirrorMaterial extends Material {
 class DiffuseMaterial extends Material {
   Vector3 baseColor = Vector3(1, 1, 1); // white
   Vector3 emitLight = Vector3.zero(); // no emission
+  Texture tex = Texture();
 
-  DiffuseMaterial(this.baseColor);
+  DiffuseMaterial(this.baseColor, [Texture? tex]) : tex = tex ?? Texture();
   DiffuseMaterial.emitter(this.emitLight);
 
   Vector3 emission() => emitLight.clone();
-  Vector3 transfer(Vector3 incomingDir, Vector3 normal, Vector3 outgoingDir) => baseColor.clone();
+  Vector3 transfer(Interaction si) => baseColor.clone()..multiply(tex.at(si.texCoords));
 
   Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
     return cosineSampleHemisphere(normal);
+  }
+}
+
+class Texture {
+  Vector3 at(Vector2 texCoord) => Vector3(1, 1, 1);
+}
+
+class GridTexture extends Texture {
+  double _lines;
+  double _halfWidth;
+  Vector3 color;
+
+  GridTexture(int lines, double lineWidthAsPorportion, [Vector3? lineColor])
+      : _lines = lines.toDouble(),
+        _halfWidth = lineWidthAsPorportion / 2.0,
+        color = lineColor ?? Vector3.zero() {}
+
+  Vector3 at(Vector2 textCoord) {
+    final x = textCoord.x * _lines;
+    final y = textCoord.y * _lines;
+    final delta = _halfWidth * _lines;
+    for (var i = 0.0; i <= _lines; i++) {
+      if ((i - delta <= x && x <= i + delta) || (i - delta <= y && y <= i + delta))
+        return color.clone();
+    }
+    return Vector3(1, 1, 1);
   }
 }
 

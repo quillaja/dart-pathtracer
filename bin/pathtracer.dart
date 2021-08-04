@@ -15,7 +15,12 @@ void main(List<String> arguments) async {
     // upper ball
     Sphere(Matrix4.translation(Vector3(-1, -1, 1)), MirrorMaterial(Vector3(0.95, 0.95, 0.95))),
     // lower ball
-    Sphere(Matrix4.translation(Vector3(-1, -2, -2)), DiffuseMaterial(Vector3(0.95, 0.95, 0.95))),
+    Sphere(
+        Matrix4.compose(
+            Vector3(-1, -2, -2), Quaternion.axisAngle(Vector3(0, 0, -1), pi / 4), Vector3.all(1)),
+        DiffuseMaterial(Vector3(0.95, 0.95, 0.95), GridTexture(8, 0.01))),
+    // Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
+    //     DiffuseMaterial(Vector3(0.95, 0.95, 0.95), GridTexture(8, 0.01))),
 
     // large white top light
     Sphere(

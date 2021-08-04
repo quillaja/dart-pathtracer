@@ -73,7 +73,7 @@ Vector3 trace(Ray r, Scene s) {
 
   var light = ambient.clone();
   for (var si in stack.reversed) {
-    var f = si.mat.transfer(si.incomingDir, si.normal, si.outgoingDir);
+    var f = si.mat.transfer(si);
     var e = si.mat.emission();
 
     // light transport equation: Lo = Le + ∫ f(p,wo,wi)* Li(p,wi) * cos(Θi) dw
