@@ -25,7 +25,8 @@ void _isolateFunction(_isolateData init) {
 /// task provided by a WorkFunction.
 class WorkerPool<Job> {
   final int _numWorkers;
-  int _jobs;
+  int _jobsAdded;
+  int _jobsCompleted;
   final bool _stopWhenJobsEmpty;
   final List<SendPort> _queues;
   final List<Isolate> _workers;
@@ -34,7 +35,8 @@ class WorkerPool<Job> {
 
   WorkerPool(int numWorkers, WorkFunction workFunction, [bool stopWhenJobsEmpty = true])
       : _numWorkers = numWorkers,
-        _jobs = 0,
+        _jobsAdded = 0,
+        _jobsCompleted = 0,
         _stopWhenJobsEmpty = stopWhenJobsEmpty,
         _queues = <SendPort>[],
         _workers = <Isolate>[],
@@ -63,23 +65,23 @@ class WorkerPool<Job> {
   ReceivePort get results => _resultPort;
 
   /// The number of jobs in the work queue(s).
-  int get jobs => _jobs;
+  int get jobs => _jobsAdded - _jobsCompleted;
 
   /// Add a job to the work queue(s).
   /// Must be called after start().
   void add(Job work) {
-    var workerIndex = _jobs % _numWorkers;
-    _jobs++;
+    var workerIndex = _jobsAdded % _numWorkers;
+    _jobsAdded++;
     _queues[workerIndex].send(work);
   }
 
   /// Add all jobs to the work queue(s).
-  void addAll(List<Job> work) => work.forEach((e) => add(e));
+  void addAll(Iterable<Job> work) => work.forEach((e) => add(e));
 
   /// Signal that a single item of work was completed.
   void done() {
-    _jobs--;
-    if (_jobs == 0 && _stopWhenJobsEmpty) stop();
+    _jobsCompleted--;
+    if (jobs == 0 && _stopWhenJobsEmpty) stop();
   }
 
   // Close the results ReceivePort and terminate the worker isolates.

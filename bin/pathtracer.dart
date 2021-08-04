@@ -9,7 +9,7 @@ import 'geometry.dart';
 import 'material.dart';
 import 'scene.dart';
 
-void main(List<String> arguments) {
+void main(List<String> arguments) async {
   const wallRadius = 5000.0;
   var s = Scene([
     // upper ball
@@ -45,19 +45,21 @@ void main(List<String> arguments) {
         DiffuseMaterial(Vector3(0.1, 0.95, 0.1))),
   ]);
 
-  final width = int.parse(arguments[0]);
-  final height = int.parse(arguments[1]);
-  final samplesPerPixel = int.parse(arguments[2]);
+  final width = arguments.length >= 1 ? int.parse(arguments[0]) : 200;
+  final height = arguments.length >= 2 ? int.parse(arguments[1]) : 200;
+  final samplesPerPixel = arguments.length >= 3 ? int.parse(arguments[2]) : 16;
+  final filename = arguments.length >= 4 ? arguments[3] : 'image.png';
 
   var film = Film(width, height);
   var cam = Camera(Vector3(3, 1, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
 
   final start = DateTime.now();
+  // await renderParallel(s, cam, samplesPerPixel);
   render(s, cam, samplesPerPixel);
   final took = DateTime.now().difference(start);
   print('took $took');
 
   var img = film.develop();
   drawString(img, arial_14, 2, 2, '$width x $height @ $samplesPerPixel spp');
-  File('image.png').writeAsBytesSync(encodePng(img));
+  File(filename).writeAsBytesSync(encodePng(img));
 }
