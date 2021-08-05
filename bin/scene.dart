@@ -8,6 +8,9 @@ import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
 
 import 'workerpool.dart';
 
+// format a Duration to HH:MM:SS.
+String fmtHMS(Duration d) => d.toString().split('.').first;
+
 class Scene {
   List<Geometry> objects;
 
@@ -33,7 +36,8 @@ void render(Scene s, Camera c, int samplesPerPixel) {
     final timeTaken = DateTime.now().difference(renderStart);
     final timeLeft =
         Duration(microseconds: timeTaken.inMicroseconds ~/ (i + 1) * (pixels.length - i));
-    stdout.write('\r${complete.toStringAsFixed(1)}% complete. Approx time left: $timeLeft.');
+    stdout.write(
+        '\r${complete.toStringAsFixed(1)}% complete. Approx time left: ${fmtHMS(timeLeft)}.');
 
     // the work
     final px = pixels[i];

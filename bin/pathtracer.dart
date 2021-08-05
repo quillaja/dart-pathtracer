@@ -10,39 +10,46 @@ import 'material.dart';
 import 'scene.dart';
 
 void main(List<String> arguments) async {
+  final textureImage = decodePng(File('colorful_grid.png').readAsBytesSync())!;
+
   const wallRadius = 5000.0;
   var s = Scene([
     // upper ball
-    Sphere(Matrix4.translation(Vector3(-1, -1, 1)), MirrorMaterial(Vector3(0.95, 0.95, 0.95))),
+    Sphere(Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
+        MirrorMaterial(Vector3(0.95, 0.95, 0.95))),
+
     // lower ball
     Sphere(
-        Matrix4.compose(
-            Vector3(-1, -2, -2), Quaternion.axisAngle(Vector3(0, 0, -1), pi / 4), Vector3.all(1)),
-        DiffuseMaterial(Vector3(0.95, 0.95, 0.95), GridTexture(8, 0.01))),
+        Matrix4.compose(Vector3(-1, -2, -2),
+            Quaternion.axisAngle(Vector3(0, 1, 0)..normalize(), pi), Vector3.all(1)),
+        DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))),
     // Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
-    //     DiffuseMaterial(Vector3(0.95, 0.95, 0.95), GridTexture(8, 0.01))),
+    //     DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))),
 
     // large white top light
     Sphere(
         Matrix4.compose(
             Vector3(0, wallRadius + 10, 0), Quaternion.identity(), Vector3.all(wallRadius)),
-        DiffuseMaterial.emitter(Vector3(1, 1, 1) * 2)),
+        DiffuseMaterial.emitter(Vector3.all(2))),
 
-    // Floor (white) -Y
+    // Floor (light gray) -Y
     Sphere(
         Matrix4.compose(
             Vector3(0, -(wallRadius + 3), 0), Quaternion.identity(), Vector3.all(wallRadius)),
         DiffuseMaterial(Vector3(0.7, 0.7, 0.7))),
+
     // Left wall (blueish) +Z
     Sphere(
         Matrix4.compose(
             Vector3(0, 0, wallRadius + 10), Quaternion.identity(), Vector3.all(wallRadius)),
         DiffuseMaterial(Vector3(0.1, 0.1, 0.95))),
+
     // Right wall (reddish) -Z
     Sphere(
         Matrix4.compose(
             Vector3(0, 0, -(wallRadius + 10)), Quaternion.identity(), Vector3.all(wallRadius)),
         DiffuseMaterial(Vector3(0.95, 0.1, 0.1))),
+
     // back wall (greenish) -X
     Sphere(
         Matrix4.compose(
@@ -62,9 +69,10 @@ void main(List<String> arguments) async {
   // await renderParallel(s, cam, samplesPerPixel);
   render(s, cam, samplesPerPixel);
   final took = DateTime.now().difference(start);
-  print('took $took');
+  print('took ${fmtHMS(took)}');
 
   var img = film.develop();
   drawString(img, arial_14, 2, 2, '$width x $height @ $samplesPerPixel spp');
+  // drawString(img, arial_14, 2, 18, 'in ${fmtHMS(took)}');
   File(filename).writeAsBytesSync(encodePng(img));
 }
