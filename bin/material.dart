@@ -1,6 +1,8 @@
+import 'package:image/image.dart';
 import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
 import 'dart:math';
 
+import 'camera.dart';
 import 'geometry.dart';
 
 abstract class Material {
@@ -56,9 +58,9 @@ class GridTexture extends Texture {
         _halfWidth = lineWidthAsPorportion / 2.0,
         color = lineColor ?? Vector3.zero() {}
 
-  Vector3 at(Vector2 textCoord) {
-    final x = textCoord.x * _lines;
-    final y = textCoord.y * _lines;
+  Vector3 at(Vector2 texCoord) {
+    final x = texCoord.x * _lines;
+    final y = texCoord.y * _lines;
     final delta = _halfWidth * _lines;
     for (var i = 0.0; i <= _lines; i++) {
       if ((i - delta <= x && x <= i + delta) || (i - delta <= y && y <= i + delta))
@@ -66,6 +68,17 @@ class GridTexture extends Texture {
     }
     return Vector3(1, 1, 1);
   }
+}
+
+class ImageTexture extends Texture {
+  Image image;
+  Interpolation _interpolation;
+
+  ImageTexture(this.image, [Interpolation interpolation = Interpolation.linear])
+      : _interpolation = interpolation;
+
+  Vector3 at(Vector2 texCoord) => colorV3(image.getPixelInterpolate(
+      texCoord.x * image.width, (1.0 - texCoord.y) * image.height, _interpolation));
 }
 
 // wo is a direction from 'base' of n (ie the point where the ray hit).

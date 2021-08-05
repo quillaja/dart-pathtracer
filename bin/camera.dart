@@ -77,9 +77,16 @@ double clamp(double x, double min_, double max_) => max(min_, min(x, max_));
 
 int v3Color(Vector3 color) {
   return 0xff000000 | //alpha
-      clamp(color.b * 255, 0, 255).toInt() << 2 * 8 |
-      clamp(color.g * 255, 0, 255).toInt() << 1 * 8 |
-      clamp(color.r * 255, 0, 255).toInt() << 0 * 8;
+      clamp(color.b * 255, 0, 255).toInt() << 2 * 8 | // B
+      clamp(color.g * 255, 0, 255).toInt() << 1 * 8 | // R
+      clamp(color.r * 255, 0, 255).toInt() << 0 * 8; // G
+}
+
+Vector3 colorV3(int color) {
+  return Vector3(
+      (((color & 0x000000ff) >> 0 * 8) / 0xff).toDouble(), //R
+      (((color & 0x0000ff00) >> 1 * 8) / 0xff).toDouble(), //G
+      (((color & 0x00ff0000) >> 2 * 8) / 0xff).toDouble()); //B
 }
 
 class Camera {
