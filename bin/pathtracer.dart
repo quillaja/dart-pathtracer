@@ -19,11 +19,11 @@ void main(List<String> arguments) async {
         MirrorMaterial(Vector3(0.95, 0.95, 0.95))),
 
     // lower ball
-    Sphere(
-        Matrix4.compose(Vector3(-1, -2, -2),
-            Quaternion.axisAngle(Vector3(0, 1, 0)..normalize(), pi), Vector3.all(1)),
+    Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
         DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))),
-    // Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
+    // Sphere(
+    //     Matrix4.compose(Vector3(-1, -2, -2),
+    //         Quaternion.axisAngle(Vector3(0, 1, 0)..normalize(), pi), Vector3.all(1)),
     //     DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))),
 
     // large white top light
