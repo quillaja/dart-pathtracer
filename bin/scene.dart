@@ -64,15 +64,24 @@ Vector3 trace(Ray r, Scene s) {
   var workingRay = r.clone();
   final stack = <Interaction>[];
   for (int d = 0; d < maxDepth; d++) {
+    // find intersection
     var h = s.intersect(workingRay);
     if (h == Hit.none) break; // early exit
 
+    // get surface interaction data about the hit
     var si = h.object!.surface(h);
     stack.add(si);
     if (si.mat.emission() != Vector3.zero()) break;
 
-    workingRay.origin = h.point!.clone() + workingRay.direction * 0.001;
+    // set working ray to next ray
     workingRay.direction = si.outgoingDir.clone();
+    workingRay.origin =
+        h.point!.clone() + workingRay.direction * 1e-3; // less than 1e-3 causes banding...
+    // NOTE: in above, had to 'advance' the origin of the next ray a small bit along
+    // the new direction. Without this, some weird black (no hit?) banding appeared
+    // on the giant spheres making up the walls of the scene. I assume due to accumulated
+    // floating point error/inaccuracy causing rays that hit the floor to 'enter'
+    // the floor and get 'stuck' inside.
   }
 
   var light = ambient.clone();

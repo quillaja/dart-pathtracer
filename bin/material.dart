@@ -28,6 +28,51 @@ class MirrorMaterial extends Material {
   }
 }
 
+class SpecularMaterial extends Material {
+  Vector3 baseColor;
+  bool isSolid;
+  double etaExternal;
+  double etaInternal;
+
+  SpecularMaterial(
+      [Vector3? baseColor, bool isSolid = true, double etaExternal = 1.0, double etaInternal = 1.0])
+      : baseColor = baseColor ?? Vector3.all(1),
+        isSolid = isSolid,
+        etaExternal = etaExternal,
+        etaInternal = etaInternal;
+
+  Vector3 emission() => Vector3.zero();
+
+  Vector3 transfer(Interaction si) {
+    final cosTerm = dot3(si.outgoingDir, si.normal);
+    if (isSolid) return baseColor.clone() / cosTerm;
+
+    final F = FrDielectric(si.incomingDir, si.normal, etaExternal, etaInternal);
+    final p = Random().nextDouble();
+    if (p < F) {
+      // reflect
+      return (baseColor.clone() * F) / cosTerm;
+    } else {
+      // refract
+      return (baseColor.clone() * (1.0 - F)) / cosTerm;
+    }
+  }
+
+  Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
+    if (isSolid) return reflect(incomingDir, normal);
+
+    final F = FrDielectric(incomingDir, normal, etaExternal, etaInternal);
+    final p = Random().nextDouble();
+    if (p < F) {
+      // reflect
+      return reflect(incomingDir, normal);
+    } else {
+      // refract
+      return refract(incomingDir, normal, etaExternal, etaInternal);
+    }
+  }
+}
+
 class DiffuseMaterial extends Material {
   Vector3 baseColor = Vector3(1, 1, 1); // white
   Vector3 emitLight = Vector3.zero(); // no emission
@@ -81,25 +126,65 @@ class ImageTexture extends Texture {
       texCoord.x * image.width, (1.0 - texCoord.y) * image.height, _interpolation));
 }
 
-// wo is a direction from 'base' of n (ie the point where the ray hit).
-// both wo and n should be normalized.
+/// wo is a direction from 'base' of n (ie the point where the ray hit).
+/// both wo and n should be normalized.
+/// assumes (i think) that wo and n are in same hemisphere.
 Vector3 reflect(Vector3 wo, Vector3 n) => -wo + n * dot3(wo, n) * 2.0;
 
-Vector3 refract(Vector3 wi, Vector3 n, double eta) {
-  var cosThetaI = dot3(n, wi);
+/// wo is a (world) direction from the 'base' of n.
+/// normal is a (world) normal.
+/// etaExternal and etaInternal are the indices of refraction for the inside
+///   and outside of the object.
+/// does not assume wi and normal are in the same hemisphere.
+Vector3 refract(Vector3 wo, Vector3 normal, double etaExternal, double etaInternal) {
+  var n = normal.clone();
+  var eta = etaExternal / etaInternal;
+  var cosThetaI = dot3(n, wo);
+  if (cosThetaI < 0) {
+    // ray is exiting, so need to 'flip' things.
+    n.negate();
+    cosThetaI = dot3(n, wo);
+    eta = etaInternal / etaExternal;
+  }
+
   var sin2ThetaI = max(0.0, 1.0 - cosThetaI * cosThetaI);
   var sin2ThetaT = eta * eta * sin2ThetaI;
+
   // Handle total internal reflection for transmission
-  if (sin2ThetaT >= 1) return Vector3.zero(); // TODO: return direction for internal reflection
+  if (sin2ThetaT >= 1) return reflect(wo, n);
 
   var cosThetaT = sqrt(1 - sin2ThetaT);
 
-  return -wi * eta + n * (eta * cosThetaI - cosThetaT);
+  return -wo * eta + n * (eta * cosThetaI - cosThetaT);
+}
+
+/// use fresnel to compute portion of ray that contributes to reflection.
+double FrDielectric(Vector3 wo, Vector3 normal, double etaExternal, double etaInternal) {
+  var cosThetaI = dot3(wo, normal);
+  if (cosThetaI < 0) {
+    // ray is exiting, so need to 'flip', things.
+    final temp = etaExternal;
+    etaExternal = etaInternal;
+    etaInternal = temp;
+    cosThetaI = -cosThetaI;
+  }
+
+  // <<Compute cosThetaT using Snell’s law>>
+  var sinThetaI = sqrt(max(0.0, 1 - cosThetaI * cosThetaI));
+  double sinThetaT = etaExternal / etaInternal * sinThetaI;
+  // <<Handle total internal reflection>>
+  double cosThetaT = sqrt(max(0.0, 1 - sinThetaT * sinThetaT));
+
+  double Rparl = ((etaInternal * cosThetaI) - (etaExternal * cosThetaT)) /
+      ((etaInternal * cosThetaI) + (etaExternal * cosThetaT));
+  double Rperp = ((etaExternal * cosThetaI) - (etaInternal * cosThetaT)) /
+      ((etaExternal * cosThetaI) + (etaInternal * cosThetaT));
+  return (Rparl * Rparl + Rperp * Rperp) / 2;
 }
 
 /// TODO: uses Random()
 Vector2 concentricSampleDisk() {
-  // <<Map uniform random numbers to >>
+  // <<Map uniform random numbers to [-1,1] >>
   final uOffset = Vector2(Random().nextDouble() * 2 - 1, Random().nextDouble() * 2 - 1);
 
   // <<Handle degeneracy at the origin>>

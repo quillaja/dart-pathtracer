@@ -41,6 +41,33 @@ Vector3 transformDirection(Matrix4 mat, Vector3 dir) {
   return mat.transformed(Vector4(dir.x, dir.y, dir.z, 0)).xyz..normalize();
 }
 
+/// solves quadratic equation using fancy methods that supposedly reduce floating
+/// point error. Returns a vector with x=minimum t and y=maximum t, or null
+/// if no (real) solution is found.
+Vector2? quadratic(double a, double b, double c) {
+  // <<Find quadratic discriminant>>
+  double discrim = b * b - 4 * a * c;
+  if (discrim < 0) return null;
+  double rootDiscrim = sqrt(discrim);
+
+  // <<Compute quadratic t values>>
+  var t = Vector2.zero();
+  double q;
+  if (b < 0)
+    q = -.5 * (b - rootDiscrim);
+  else
+    q = -.5 * (b + rootDiscrim);
+
+  t.x = q / a;
+  t.y = c / q;
+  if (t.x > t.y) {
+    final temp = t.x;
+    t.x = t.y;
+    t.y = temp;
+  }
+  return t;
+}
+
 abstract class Geometry {
   // from world coord system to model coord system
   Matrix4 worldModel = Matrix4.identity();
@@ -66,13 +93,29 @@ class Sphere extends Geometry {
     final a = 1.0; //dot3(rLocal.direction, rLocal.direction);
     final b = 2.0 * dot3(oc, rLocal.direction);
     final c = dot3(oc, oc) - 1.0;
+    /* // this part is replaced by quadratic() and the couple lines after.
     final discriminant = b * b - 4.0 * a * c;
 
     if (discriminant < 0.0) return Hit.none;
 
     // local hit location
-    final tLocal = (-b - sqrt(discriminant)) / (2.0 * a);
+    var tLocalMin = (-b + sqrt(discriminant)) / (2.0 * a);
+    var tLocalMax = (-b - sqrt(discriminant)) / (2.0 * a);
+    if (tLocalMin > tLocalMax) {
+      // swap if necessary
+      final temp = tLocalMin;
+      tLocalMin = tLocalMax;
+      tLocalMax = temp;
+    }
+    */
+    final tVals = quadratic(a, b, c);
+    if (tVals == null) return Hit.none;
+    var tLocal = tVals.x;
+    if (tLocal <= 0.0) {
+      tLocal = tVals.y;
+    }
     final pLocal = rLocal.origin + rLocal.direction * tLocal;
+
     // world hit location
     final p = modelWorld.transformed3(pLocal);
     final t = dot3((p - r.origin), r.direction);
@@ -82,7 +125,7 @@ class Sphere extends Geometry {
 
   Interaction surface(Hit h) {
     // normal
-    final localNormal = worldModel.transformed3(h.point!).normalized();
+    final localNormal = worldModel.transformed3(h.point!)..normalize();
     final worldNormal = transformDirection(modelWorld, localNormal);
     // texture coords (cylindrical)
     final u = atan2(localNormal.x, localNormal.z) / (2 * pi) + 0.5;
