@@ -24,8 +24,11 @@ class Interaction {
   Vector3 emission;
   Vector2 texCoords;
 
-  Interaction(this.normal, this.incomingDir, this.outgoingDir, this.pdf, this.transfer,
-      this.emission, this.texCoords);
+  Interaction(this.normal, this.incomingDir, this.texCoords)
+      : outgoingDir = Vector3.zero(),
+        pdf = 0.0,
+        transfer = Vector3.zero(),
+        emission = Vector3.zero();
 }
 
 class Ray {
@@ -135,7 +138,9 @@ class Sphere extends Geometry {
     final v = localNormal.y * 0.5 + 0.5;
     // ray directions
     final incomingDir = -h.r!.direction;
-    final outgoingDir = mat.getOutgoingDir(incomingDir, worldNormal);
-    return Interaction(worldNormal, incomingDir, outgoingDir, mat, Vector2(u, v));
+
+    final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
+    mat.sample(si);
+    return si;
   }
 }

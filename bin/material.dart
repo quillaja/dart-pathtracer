@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:image/image.dart';
 import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
 import 'dart:math';
@@ -16,12 +18,11 @@ class MirrorMaterial extends Material {
 
   MirrorMaterial(this.baseColor);
 
-  Vector3 emission() => Vector3.zero();
-
-  Vector3 transfer(Interaction si) => baseColor.clone() / dot3(si.outgoingDir, si.normal);
-
-  Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
-    return reflect(incomingDir, normal);
+  void sample(Interaction si) {
+    si.outgoingDir = reflect(si.incomingDir, si.normal);
+    si.emission = Vector3.zero();
+    si.transfer = baseColor.clone() / dot3(si.outgoingDir, si.normal);
+    si.pdf = 1.0;
   }
 }
 
@@ -38,35 +39,31 @@ class SpecularMaterial extends Material {
         etaExternal = etaExternal,
         etaInternal = etaInternal;
 
-  Vector3 emission() => Vector3.zero();
+  void sample(Interaction si) {
+    // treat solid specular as 'mirror'
+    if (isSolid) {
+      final m = MirrorMaterial(baseColor);
+      m.sample(si);
+      return;
+    }
 
-  Vector3 transfer(Interaction si) {
-    final cosTerm = dot3(si.outgoingDir, si.normal);
-    if (isSolid) return baseColor.clone() / cosTerm;
+    si.emission = Vector3.zero(); // this material can never be an emitter.
 
     final F = FrDielectric(si.incomingDir, si.normal, etaExternal, etaInternal);
     final p = Random().nextDouble();
     if (p < F) {
       // reflect
-      return (baseColor.clone()) / cosTerm;
+      si.outgoingDir = reflect(si.incomingDir, si.normal);
+      si.pdf = F;
+      si.transfer = (baseColor.clone() * F) / dot3(si.outgoingDir, si.normal);
+      return;
     } else {
       // refract
-      final T = (1.0 - F);
-      return (baseColor.clone()) / cosTerm;
-    }
-  }
-
-  Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
-    if (isSolid) return reflect(incomingDir, normal);
-
-    final F = FrDielectric(incomingDir, normal, etaExternal, etaInternal);
-    final p = Random().nextDouble();
-    if (p < F) {
-      // reflect
-      return reflect(incomingDir, normal);
-    } else {
-      // refract
-      return refract(incomingDir, normal, etaExternal, etaInternal);
+      final T = 1.0 - F;
+      si.outgoingDir = refract(si.incomingDir, si.normal, etaExternal, etaInternal);
+      si.pdf = T;
+      si.transfer = (baseColor.clone() * T) / dot3(si.outgoingDir, si.normal);
+      return;
     }
   }
 }
@@ -79,11 +76,11 @@ class DiffuseMaterial extends Material {
   DiffuseMaterial(this.baseColor, [Texture? tex]) : tex = tex ?? Texture();
   DiffuseMaterial.emitter(this.emitLight);
 
-  Vector3 emission() => emitLight.clone();
-  Vector3 transfer(Interaction si) => baseColor.clone()..multiply(tex.at(si.texCoords));
-
-  Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal) {
-    return cosineSampleHemisphere(normal);
+  void sample(Interaction si) {
+    si.outgoingDir = cosineSampleHemisphere(si.normal);
+    si.transfer = baseColor.clone()..multiply(tex.at(si.texCoords));
+    si.emission = emitLight.clone();
+    si.pdf = dot3(si.outgoingDir, si.normal) / pi; // TODO: hmmm
   }
 }
 
