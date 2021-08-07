@@ -19,10 +19,13 @@ class Interaction {
   Vector3 normal;
   Vector3 incomingDir;
   Vector3 outgoingDir;
-  Material mat;
+  double pdf;
+  Vector3 transfer;
+  Vector3 emission;
   Vector2 texCoords;
 
-  Interaction(this.normal, this.incomingDir, this.outgoingDir, this.mat, this.texCoords);
+  Interaction(this.normal, this.incomingDir, this.outgoingDir, this.pdf, this.transfer,
+      this.emission, this.texCoords);
 }
 
 class Ray {

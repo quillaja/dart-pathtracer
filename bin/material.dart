@@ -6,12 +6,9 @@ import 'camera.dart';
 import 'geometry.dart';
 
 abstract class Material {
-  Vector3 emission();
-  // eg on 'diffuse' materials, will return the 'base color'
-  Vector3 transfer(Interaction si);
-  // eg on 'diffuse' materials, will return a random direction on the hemisphere,
-  // for specular, will produce 'mirror' reflection, etc.
-  Vector3 getOutgoingDir(Vector3 incomingDir, Vector3 normal);
+  /// sample() will use the normal and incomingDir to update the Interaction's
+  /// outgoingDir, pdf, transfer, and emission members.
+  void sample(Interaction si);
 }
 
 class MirrorMaterial extends Material {
@@ -51,10 +48,11 @@ class SpecularMaterial extends Material {
     final p = Random().nextDouble();
     if (p < F) {
       // reflect
-      return (baseColor.clone() * F) / cosTerm;
+      return (baseColor.clone()) / cosTerm;
     } else {
       // refract
-      return (baseColor.clone() * (1.0 - F)) / cosTerm;
+      final T = (1.0 - F);
+      return (baseColor.clone()) / cosTerm;
     }
   }
 

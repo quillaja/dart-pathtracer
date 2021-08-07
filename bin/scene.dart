@@ -82,6 +82,7 @@ Vector3 trace(Ray r, Scene s) {
     // on the giant spheres making up the walls of the scene. I assume due to accumulated
     // floating point error/inaccuracy causing rays that hit the floor to 'enter'
     // the floor and get 'stuck' inside.
+    // see: https://www.pbr-book.org/3ed-2018/Shapes/Managing_Rounding_Error
   }
 
   var light = ambient.clone();
