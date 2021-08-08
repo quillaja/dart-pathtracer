@@ -138,7 +138,7 @@ Vector3 refract(Vector3 wo, Vector3 normal, double etaExternal, double etaIntern
   if (cosThetaI < 0) {
     // ray is exiting, so need to 'flip' things.
     n.negate();
-    cosThetaI = dot3(n, wo);
+    cosThetaI = -cosThetaI; // dot3(n, wo);
     eta = etaInternal / etaExternal;
   }
 

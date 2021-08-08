@@ -16,13 +16,12 @@ void main(List<String> arguments) async {
   var s = Scene([
     // upper ball
     Sphere(Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
-        SpecularMaterial(Vector3(0.95, 0.95, 0.95))),
+        MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
     // SpecularMaterial(Vector3(0.95, 0.95, 0.95), false, 1.0, 1.5)), // glass
-    // MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
 
     // lower ball
     Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
-        SpecularMaterial(Vector3(0.95, 0.95, 0.95), false, 1.0, 1.5)), // glass
+        SpecularMaterial(Vector3.all(1), false, 1.0, 1.5)), // glass
     // DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))), // texture
     // Sphere(
     //     Matrix4.compose(Vector3(-1, -2, -2),
@@ -33,7 +32,7 @@ void main(List<String> arguments) async {
     Sphere(
         Matrix4.compose(
             Vector3(0, wallRadius + 10, 0), Quaternion.identity(), Vector3.all(wallRadius)),
-        DiffuseMaterial.emitter(Vector3.all(2))),
+        DiffuseMaterial.emitter(Vector3.all(2.5))),
 
     // Floor (light gray) -Y
     Sphere(
@@ -58,6 +57,12 @@ void main(List<String> arguments) async {
         Matrix4.compose(
             Vector3(-(wallRadius + 10), 0, 0), Quaternion.identity(), Vector3.all(wallRadius)),
         DiffuseMaterial(Vector3(0.1, 0.95, 0.1))),
+
+    // behind camera wall (light gray) +X
+    Sphere(
+        Matrix4.compose(
+            Vector3(wallRadius + 10, 0, 0), Quaternion.identity(), Vector3.all(wallRadius)),
+        DiffuseMaterial(Vector3(0.7, 0.7, 0.7))),
   ]);
 
   final width = arguments.length >= 1 ? int.parse(arguments[0]) : 200;
@@ -66,7 +71,7 @@ void main(List<String> arguments) async {
   final filename = arguments.length >= 4 ? arguments[3] : 'image.png';
 
   var film = Film(width, height);
-  var cam = Camera(Vector3(3, 1, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 3.0, film);
+  var cam = Camera(Vector3(3, 2, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
 
   final start = DateTime.now();
   // await renderParallel(s, cam, samplesPerPixel);
