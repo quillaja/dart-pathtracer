@@ -99,78 +99,105 @@ Vector3 trace(Ray r, Scene s) {
 // This is slower than single threaded rendering... =(
 // Maybe i have to make larger chunks of work.
 
-class PixelJob {
-  Vector2 px;
-  Scene s;
-  Camera c;
-  int samplesPerPixel;
+class Region {
+  int yStart;
+  int yEnd;
+  int width;
 
-  PixelJob(this.px, this.s, this.c, this.samplesPerPixel);
+  Region(this.yStart, this.yEnd, this.width);
 }
 
-class PixelResult {
-  Vector2 px;
-  Vector3 pxColor;
+class RegionJob {
+  Region r;
+  int samplesPerPixel;
+  Scene s;
+  RayGenerator rayGenerator;
 
-  PixelResult(this.px, this.pxColor);
+  RegionJob(this.r, this.samplesPerPixel, this.s, this.rayGenerator);
+}
+
+class RegionResult {
+  Region r;
+  List<Vector3> colors;
+
+  RegionResult(this.r, this.colors);
 }
 
 Future<void> renderParallel(Scene s, Camera c, int samplesPerPixel) async {
-  var pool = WorkerPool<PixelJob>(7, pixelWorkFunction);
+  const workers = 6;
+  const regions = 10;
 
-  var pixels = c.film.pixels();
-  var jobs = pixels.map((px) => PixelJob(px, s, c, samplesPerPixel)).toList(growable: false);
-  // var jobs = (i, n) => pixels.map((px) => PixelJob(px, s, c, samplesPerPixel)).skip(i).take(n);
+  // create jobs
+  final regionHeight = c.film.height ~/ regions;
+  final leftoverHeight = c.film.height % regions;
+  final jobs = <RegionJob>[];
+  for (var i = 0; i < regions; i++) {
+    var r = Region(i * regionHeight, (i + 1) * regionHeight, c.film.width);
+    jobs.add(RegionJob(r, samplesPerPixel, s, c.getRayGenerator()));
+  }
+  if (leftoverHeight > 0) {
+    jobs.add(RegionJob(Region(jobs.last.r.yEnd, jobs.last.r.yEnd + leftoverHeight, c.film.width),
+        samplesPerPixel, s, c.getRayGenerator()));
+  }
+
+  // start worker pool
+  var pool = WorkerPool<RegionJob>(workers, regionWorkFunction);
   await pool.start();
-  var i = 0;
-  final startNum = 7 * 2;
-  print(startNum);
-  for (; i < startNum;) pool.add(jobs[i++]);
-  print(pool.jobs);
+  pool.addAll(jobs);
 
+  // listen on results stream
   print('start result listening loop');
-  // var renderStart = DateTime.now();
+  var numComplete = 0;
   await for (var result in pool.results) {
-    result = result as PixelResult;
-    final x = result.px.x.toInt();
-    final y = result.px.y.toInt();
-    final color = result.pxColor;
-    c.film.setAt(x, y, color);
+    result = result as RegionResult;
+    final r = result.r;
+    final colors = result.colors;
 
-    pool.add(jobs[i++]);
-    pool.done();
+    var index = 0;
+    for (var y = r.yStart; y < r.yEnd; y++) {
+      for (var x = 0; x < r.width; x++) {
+        c.film.setAt(x, y, colors[index++]);
+      }
+    }
 
-    // final numCompleted = pixels.length - pool.jobs;
-    // final timeTaken = DateTime.now().difference(renderStart);
-    // final timeLeft = Duration(microseconds: timeTaken.inMicroseconds ~/ numCompleted * pool.jobs);
-    final percentComplete = (i.toDouble() / jobs.length.toDouble()) * 100.0;
-    stdout.write('\r$i ${pool.jobs} ${percentComplete.toStringAsFixed(2)}% complete.');
+    pool.done(); // signal that a job was completed
+    numComplete++;
+
+    final percentComplete = (numComplete.toDouble() / regions.toDouble()) * 100.0;
+    stdout.write('\r$numComplete ${pool.jobs} ${percentComplete.toStringAsFixed(2)}% complete.');
   }
   pool.stop();
   print('');
 }
 
-Future<void> pixelWorkFunction(ReceivePort input, SendPort output) async {
+Future<void> regionWorkFunction(ReceivePort input, SendPort output) async {
   final rng = Random(DateTime.now().microsecondsSinceEpoch);
   await for (var data in input) {
-    data = data as PixelJob;
-    final px = data.px;
+    data = data as RegionJob;
+    final r = data.r;
     final samplesPerPixel = data.samplesPerPixel;
     final s = data.s;
-    final c = data.c;
+    final rayGenerator = data.rayGenerator;
 
-    var accumlatedLight = Vector3.zero();
-    for (int i = 0; i < samplesPerPixel; i++) {
-      // jitter in ray origin
-      final dx = rng.nextDouble() - 0.5;
-      final dy = rng.nextDouble() - 0.5;
-      final jitterpx = Vector2(px.x + dx, px.y + dy);
-      // get ray and trace
-      var r = c.getRay(jitterpx);
-      accumlatedLight += trace(r, s);
+    final result = RegionResult(r, <Vector3>[]);
+
+    for (double y = r.yStart.toDouble(); y < r.yEnd; y++) {
+      for (double x = 0.0; x < r.width; x++) {
+        var accumlatedLight = Vector3.zero();
+        for (int i = 0; i < samplesPerPixel; i++) {
+          // jitter in ray origin
+          final dx = rng.nextDouble() - 0.5;
+          final dy = rng.nextDouble() - 0.5;
+          final jitterpx = Vector2(x + dx, y + dy);
+          // get ray and trace
+          var r = rayGenerator.getRay(jitterpx);
+          accumlatedLight += trace(r, s);
+        }
+        accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
+        result.colors.add(accumlatedLight);
+      }
     }
-    accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
 
-    output.send(PixelResult(px, accumlatedLight));
+    output.send(result);
   }
 }

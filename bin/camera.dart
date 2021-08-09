@@ -120,4 +120,24 @@ class Camera {
     var d = (farWorld - position)..normalize();
     return Ray(position, d);
   }
+
+  RayGenerator getRayGenerator() => RayGenerator(viewproj, position, film.width, film.height);
+}
+
+/// Used to pass camera projection information to render worker isolates.
+class RayGenerator {
+  final Matrix4 viewproj;
+  final Vector3 camPosition;
+  final int filmWidth;
+  final int filmHeight;
+  RayGenerator(this.viewproj, this.camPosition, this.filmWidth, this.filmHeight);
+
+  Ray getRay(Vector2 pixel) {
+    var farWorld = Vector3.zero();
+    // film.height-y provides inversion of image plane from opengl (origin in left bottom)
+    // to 'normal images' (origin in left top)
+    unproject(viewproj, 0, filmWidth, 0, filmHeight, pixel.x, filmHeight - pixel.y, 1.0, farWorld);
+    var d = (farWorld - camPosition)..normalize();
+    return Ray(camPosition, d);
+  }
 }
