@@ -80,8 +80,8 @@ class WorkerPool<Job> {
 
   /// Signal that a single item of work was completed.
   void done() {
-    _jobsCompleted--;
-    if (jobs == 0 && _stopWhenJobsEmpty) stop();
+    _jobsCompleted++;
+    if (jobs <= 0 && _stopWhenJobsEmpty) stop();
   }
 
   // Close the results ReceivePort and terminate the worker isolates.
