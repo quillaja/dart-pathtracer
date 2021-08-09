@@ -74,8 +74,8 @@ void main(List<String> arguments) async {
   var cam = Camera(Vector3(3, 2, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
 
   final start = DateTime.now();
-  // await renderParallel(s, cam, samplesPerPixel);
-  render(s, cam, samplesPerPixel);
+  await renderParallel(s, cam, samplesPerPixel);
+  // render(s, cam, samplesPerPixel);
   final took = DateTime.now().difference(start);
   print('took ${fmtHMS(took)}');
 

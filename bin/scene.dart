@@ -26,6 +26,7 @@ class Scene {
   }
 }
 
+/// renders the scene from camera's point of view.
 void render(Scene s, Camera c, int samplesPerPixel) {
   var pixels = c.film.pixels();
 
@@ -57,6 +58,7 @@ void render(Scene s, Camera c, int samplesPerPixel) {
   print('');
 }
 
+/// traces a single ray.
 Vector3 trace(Ray r, Scene s) {
   const maxDepth = 8;
   final ambient = Vector3.zero(); //(0.1, 0.1, 0.1);
@@ -96,9 +98,12 @@ Vector3 trace(Ray r, Scene s) {
 }
 
 // parallel rendering ///////////////////////////////////////
-// This is slower than single threaded rendering... =(
+// Per-pixel work chunks: This is slower than single threaded rendering... =(
 // Maybe i have to make larger chunks of work.
+// Region work chunks: works much better.
 
+/// A region on the final image. Currently they're always divided vertically,
+/// and regions are the full width of the image.
 class Region {
   int yStart;
   int yEnd;
@@ -107,6 +112,7 @@ class Region {
   Region(this.yStart, this.yEnd, this.width);
 }
 
+/// Data required to render each region.
 class RegionJob {
   Region r;
   int samplesPerPixel;
@@ -116,6 +122,7 @@ class RegionJob {
   RegionJob(this.r, this.samplesPerPixel, this.s, this.rayGenerator);
 }
 
+/// The render results.
 class RegionResult {
   Region r;
   List<Vector3> colors;
@@ -123,9 +130,11 @@ class RegionResult {
   RegionResult(this.r, this.colors);
 }
 
+/// A function that orchestrates parallel rendering by creating a worker pool,
+/// jobs, and then combining the results.
 Future<void> renderParallel(Scene s, Camera c, int samplesPerPixel) async {
   const workers = 6;
-  const regions = 10;
+  const regions = workers * 2;
 
   // create jobs
   final regionHeight = c.film.height ~/ regions;
@@ -146,7 +155,7 @@ Future<void> renderParallel(Scene s, Camera c, int samplesPerPixel) async {
   pool.addAll(jobs);
 
   // listen on results stream
-  print('start result listening loop');
+  print('Processing ${jobs.length} regions.');
   var numComplete = 0;
   await for (var result in pool.results) {
     result = result as RegionResult;
@@ -164,12 +173,15 @@ Future<void> renderParallel(Scene s, Camera c, int samplesPerPixel) async {
     numComplete++;
 
     final percentComplete = (numComplete.toDouble() / regions.toDouble()) * 100.0;
-    stdout.write('\r$numComplete ${pool.jobs} ${percentComplete.toStringAsFixed(2)}% complete.');
+    stdout.write(
+        '\r${percentComplete.toStringAsFixed(1)}% complete. $numComplete regions complete. ${pool.jobs} left.');
   }
   pool.stop();
   print('');
 }
 
+/// Performs the work of actually rendering regions queued up in 'input'.
+/// Results are sent back via 'output'.
 Future<void> regionWorkFunction(ReceivePort input, SendPort output) async {
   final rng = Random(DateTime.now().microsecondsSinceEpoch);
   await for (var data in input) {
