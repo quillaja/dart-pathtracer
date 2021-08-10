@@ -148,12 +148,12 @@ class Sphere extends Geometry {
 /// Plane is by default a 2d 1x1 square on the x-y plane, with center at the origin
 /// and with a face normal towards the positive z axis.
 class Plane extends Geometry {
-  Vector2 width;
   Material mat;
+  Extent extent;
 
-  Plane(Matrix4 modelWorld, Material mat, [Vector2? width])
+  Plane(Matrix4 modelWorld, Material mat, [Extent? extent])
       : mat = mat,
-        width = width ?? Vector2.all(1) {
+        extent = extent ?? RectExtent(Vector2.all(1)) {
     this.modelWorld = modelWorld;
     this.worldModel = modelWorld.clone()..invert();
   }
@@ -171,8 +171,7 @@ class Plane extends Geometry {
     final pLocal = modelRay.origin + modelRay.direction * tLocal;
 
     // check plane extents
-    if ((pLocal.x < -width.x / 2 || pLocal.x > width.x / 2) ||
-        (pLocal.y < -width.y / 2 || pLocal.y > width.y / 2)) return Hit.none;
+    if (!extent.contains(pLocal.xy)) return Hit.none;
 
     // world point and t
     final p = modelWorld.transformed3(pLocal);
@@ -186,11 +185,32 @@ class Plane extends Geometry {
     final incomingDir = -h.r!.direction;
     // texture coords
     final pLocal = worldModel.transformed3(h.point!);
-    final u = (pLocal.x + width.x / 2.0) / width.x;
-    final v = (pLocal.y + width.y / 2.0) / width.y;
+    final uv = extent.uv(pLocal.xy);
 
-    final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
+    final si = Interaction(worldNormal, incomingDir, uv);
     mat.sample(si, rng);
     return si;
   }
+}
+
+abstract class Extent {
+  bool contains(Vector2 p);
+  Vector2 uv(Vector2 p);
+}
+
+class RectExtent extends Extent {
+  final Vector2 width;
+  RectExtent(this.width);
+  bool contains(Vector2 p) =>
+      (-width.x / 2 <= p.x && p.x <= width.x / 2) && (-width.y / 2 <= p.y && p.y <= width.y / 2);
+  Vector2 uv(Vector2 p) => (p + width / 2.0)..divide(width);
+}
+
+class CircExtent extends Extent {
+  final double innerRadius;
+  final double outerRadius;
+  CircExtent(this.innerRadius, this.outerRadius);
+  bool contains(Vector2 p) => innerRadius <= p.length && p.length <= outerRadius;
+  Vector2 uv(Vector2 p) => Vector2((atan2(p.y, p.x) + pi) / (2.0 * pi),
+      1.0 - ((p.length - innerRadius) / (outerRadius - innerRadius)));
 }
