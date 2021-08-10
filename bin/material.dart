@@ -8,7 +8,7 @@ import 'geometry.dart';
 abstract class Material {
   /// sample() will use the normal and incomingDir to update the Interaction's
   /// outgoingDir, pdf, transfer, and emission members.
-  void sample(Interaction si);
+  void sample(Interaction si, Random rng);
 }
 
 class MirrorMaterial extends Material {
@@ -16,7 +16,7 @@ class MirrorMaterial extends Material {
 
   MirrorMaterial(this.baseColor);
 
-  void sample(Interaction si) {
+  void sample(Interaction si, Random rng) {
     // flipping normal doesn't *seem* to matter for reflect(), but i'll do
     // it to be certain things are correct.
     si.outgoingDir = reflect(si.incomingDir, flipNormal(si.normal, si.incomingDir));
@@ -39,18 +39,18 @@ class SpecularMaterial extends Material {
         etaExternal = etaExternal,
         etaInternal = etaInternal;
 
-  void sample(Interaction si) {
+  void sample(Interaction si, Random rng) {
     // treat solid specular as 'mirror'
     if (isSolid) {
       final m = MirrorMaterial(baseColor);
-      m.sample(si);
+      m.sample(si, rng);
       return;
     }
 
     si.emission = Vector3.zero(); // this material can never be an emitter.
 
     final F = FrDielectric(si.incomingDir, si.normal, etaExternal, etaInternal);
-    final p = Random().nextDouble();
+    final p = rng.nextDouble();
     if (p < F) {
       // reflect
       si.outgoingDir = reflect(si.incomingDir, flipNormal(si.normal, si.incomingDir));
@@ -76,14 +76,22 @@ class DiffuseMaterial extends Material {
   DiffuseMaterial(this.baseColor, [Texture? tex]) : tex = tex ?? Texture();
   DiffuseMaterial.emitter(this.emitLight);
 
-  void sample(Interaction si) {
+  void sample(Interaction si, Random rng) {
     // flip normal to match the incoming light direction, or the resulting
     // outgoing direction will be on the incorrect side of the surface.
-    si.outgoingDir = cosineSampleHemisphere(flipNormal(si.normal, si.incomingDir));
+    si.outgoingDir = cosineSampleHemisphere(flipNormal(si.normal, si.incomingDir), rng);
     si.transfer = baseColor.clone()..multiply(tex.at(si.texCoords));
     si.emission = emitLight.clone();
     si.pdf = dot3(si.outgoingDir, si.normal) / pi; // TODO: hmmm
   }
+}
+
+class MixMaterial extends Material {
+  final List<Material> mats;
+
+  MixMaterial(this.mats);
+
+  void sample(Interaction si, Random rng) => mats[rng.nextInt(mats.length)].sample(si, rng);
 }
 
 class Texture {
@@ -187,9 +195,9 @@ double FrDielectric(Vector3 wo, Vector3 normal, double etaExternal, double etaIn
 }
 
 /// TODO: uses Random()
-Vector2 concentricSampleDisk() {
+Vector2 concentricSampleDisk(Random rng) {
   // <<Map uniform random numbers to [-1,1] >>
-  final uOffset = Vector2(Random().nextDouble() * 2 - 1, Random().nextDouble() * 2 - 1);
+  final uOffset = Vector2(rng.nextDouble() * 2 - 1, rng.nextDouble() * 2 - 1);
 
   // <<Handle degeneracy at the origin>>
   if (uOffset.x == 0 && uOffset.y == 0) return Vector2.zero();
@@ -207,14 +215,14 @@ Vector2 concentricSampleDisk() {
 }
 
 // sample a random direction on the hemisphere about normal.
-Vector3 cosineSampleHemisphere(Vector3 normal) {
+Vector3 cosineSampleHemisphere(Vector3 normal, Random rng) {
   // Make an orthogonal basis whose third vector is along `direction'
   Vector3 b3 = normal;
   Vector3 different = b3.x.abs() < 0.5 ? Vector3(1.0, 0.0, 0.0) : Vector3(0.0, 1.0, 0.0);
   Vector3 b1 = b3.cross(different).normalized();
   Vector3 b2 = b1.cross(b3);
 
-  var d = concentricSampleDisk();
+  var d = concentricSampleDisk(rng);
   var z = sqrt(max(0.0, 1.0 - d.x * d.x - d.y * d.y));
   return (b1 * d.x + b2 * d.y + b3 * z); //.normalized();
 }

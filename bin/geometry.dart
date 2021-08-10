@@ -81,7 +81,7 @@ abstract class Geometry {
   Matrix4 modelWorld = Matrix4.identity();
 
   Hit intersect(Ray r);
-  Interaction surface(Hit h);
+  Interaction surface(Hit h, Random rng);
 }
 
 class Sphere extends Geometry {
@@ -129,7 +129,7 @@ class Sphere extends Geometry {
     return Hit(t, r, this);
   }
 
-  Interaction surface(Hit h) {
+  Interaction surface(Hit h, Random rng) {
     // normal
     final localNormal = worldModel.transformed3(h.point!)..normalize();
     final worldNormal = transformDirection(modelWorld, localNormal);
@@ -140,7 +140,7 @@ class Sphere extends Geometry {
     final incomingDir = -h.r!.direction;
 
     final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
-    mat.sample(si);
+    mat.sample(si, rng);
     return si;
   }
 }
@@ -181,7 +181,7 @@ class Plane extends Geometry {
     return Hit(t, r, this);
   }
 
-  Interaction surface(Hit h) {
+  Interaction surface(Hit h, Random rng) {
     final worldNormal = transformDirection(modelWorld, Vector3(0, 0, 1));
     final incomingDir = -h.r!.direction;
     // texture coords
@@ -190,7 +190,7 @@ class Plane extends Geometry {
     final v = (pLocal.y + width.y / 2.0) / width.y;
 
     final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
-    mat.sample(si);
+    mat.sample(si, rng);
     return si;
   }
 }

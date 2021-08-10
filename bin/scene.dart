@@ -50,7 +50,7 @@ void render(Scene s, Camera c, int samplesPerPixel) {
       final jitterpx = Vector2(px.x + dx, px.y + dy);
       // get ray and trace
       var r = c.getRay(jitterpx);
-      accumlatedLight += trace(r, s);
+      accumlatedLight += trace(r, s, Random());
     }
     accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
     c.film.setAt(px.x.toInt(), px.y.toInt(), accumlatedLight);
@@ -59,7 +59,7 @@ void render(Scene s, Camera c, int samplesPerPixel) {
 }
 
 /// traces a single ray.
-Vector3 trace(Ray r, Scene s) {
+Vector3 trace(Ray r, Scene s, Random rng) {
   const maxDepth = 8;
   final ambient = Vector3.zero(); //(0.1, 0.1, 0.1);
 
@@ -71,7 +71,7 @@ Vector3 trace(Ray r, Scene s) {
     if (h == Hit.none) break; // early exit
 
     // get surface interaction data about the hit
-    var si = h.object!.surface(h);
+    var si = h.object!.surface(h, rng);
     stack.add(si);
     if (si.emission != Vector3.zero()) break;
 
@@ -203,7 +203,7 @@ Future<void> regionWorkFunction(ReceivePort input, SendPort output) async {
           final jitterpx = Vector2(x + dx, y + dy);
           // get ray and trace
           var r = rayGenerator.getRay(jitterpx);
-          accumlatedLight += trace(r, s);
+          accumlatedLight += trace(r, s, rng);
         }
         accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
         result.colors.add(accumlatedLight);

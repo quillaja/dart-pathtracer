@@ -22,8 +22,10 @@ void main(List<String> arguments) async {
     Plane(
         Matrix4.compose(Vector3(-4, 0, 0),
             Quaternion.axisAngle(Vector3(0, 1, -0.2)..normalize(), 3 * pi / 4), Vector3.all(1)),
-        DiffuseMaterial(Vector3.all(0.95), GridTexture(4, 1e-2)),
-        // MirrorMaterial(Vector3.all(0.9)),
+        MixMaterial([
+          DiffuseMaterial(Vector3.all(0.95), GridTexture(4, 1e-2)),
+          MirrorMaterial(Vector3.all(0.95))
+        ]),
         Vector2(7, 5)),
 
     // lower ball
