@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:image/image.dart';
 import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
 import 'dart:math';
@@ -19,7 +17,9 @@ class MirrorMaterial extends Material {
   MirrorMaterial(this.baseColor);
 
   void sample(Interaction si) {
-    si.outgoingDir = reflect(si.incomingDir, si.normal);
+    // flipping normal doesn't *seem* to matter for reflect(), but i'll do
+    // it to be certain things are correct.
+    si.outgoingDir = reflect(si.incomingDir, flipNormal(si.normal, si.incomingDir));
     si.emission = Vector3.zero();
     si.transfer = baseColor.clone() / dot3(si.outgoingDir, si.normal);
     si.pdf = 1.0;
@@ -53,7 +53,7 @@ class SpecularMaterial extends Material {
     final p = Random().nextDouble();
     if (p < F) {
       // reflect
-      si.outgoingDir = reflect(si.incomingDir, si.normal);
+      si.outgoingDir = reflect(si.incomingDir, flipNormal(si.normal, si.incomingDir));
       si.pdf = F;
       si.transfer = (baseColor.clone() * F) / dot3(si.outgoingDir, si.normal);
       return;
@@ -77,7 +77,9 @@ class DiffuseMaterial extends Material {
   DiffuseMaterial.emitter(this.emitLight);
 
   void sample(Interaction si) {
-    si.outgoingDir = cosineSampleHemisphere(si.normal);
+    // flip normal to match the incoming light direction, or the resulting
+    // outgoing direction will be on the incorrect side of the surface.
+    si.outgoingDir = cosineSampleHemisphere(flipNormal(si.normal, si.incomingDir));
     si.transfer = baseColor.clone()..multiply(tex.at(si.texCoords));
     si.emission = emitLight.clone();
     si.pdf = dot3(si.outgoingDir, si.normal) / pi; // TODO: hmmm
@@ -119,6 +121,13 @@ class ImageTexture extends Texture {
 
   Vector3 at(Vector2 texCoord) => colorV3(image.getPixelInterpolate(
       texCoord.x * image.width, (1.0 - texCoord.y) * image.height, _interpolation));
+}
+
+Vector3 flipNormal(Vector3 n, Vector3 wo) {
+  final cosTheta = dot3(n, wo);
+  if (cosTheta < 0) return -n;
+
+  return n.clone();
 }
 
 /// wo is a direction from 'base' of n (ie the point where the ray hit).
@@ -197,6 +206,7 @@ Vector2 concentricSampleDisk() {
   return Vector2(cos(theta), sin(theta)) * r;
 }
 
+// sample a random direction on the hemisphere about normal.
 Vector3 cosineSampleHemisphere(Vector3 normal) {
   // Make an orthogonal basis whose third vector is along `direction'
   Vector3 b3 = normal;

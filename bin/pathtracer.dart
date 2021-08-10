@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:image/image.dart';
-import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
+import 'package:vector_math/vector_math.dart' hide Ray, Sphere, Plane;
 
 import 'camera.dart';
 import 'geometry.dart';
@@ -15,9 +15,16 @@ void main(List<String> arguments) async {
   const wallRadius = 5000.0;
   var s = Scene([
     // upper ball
-    Sphere(Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
-        MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
+    // Sphere(Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
+    // MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
     // SpecularMaterial(Vector3(0.95, 0.95, 0.95), false, 1.0, 1.5)), // glass
+
+    Plane(
+        Matrix4.compose(Vector3(-4, 0, 0),
+            Quaternion.axisAngle(Vector3(0, 1, -0.2)..normalize(), 3 * pi / 4), Vector3.all(1)),
+        DiffuseMaterial(Vector3.all(0.95), GridTexture(4, 1e-2)),
+        // MirrorMaterial(Vector3.all(0.9)),
+        Vector2(7, 5)),
 
     // lower ball
     Sphere(Matrix4.translation(Vector3(-1, -2, -2)),

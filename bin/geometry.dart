@@ -1,4 +1,4 @@
-import 'package:vector_math/vector_math.dart' hide Ray, Sphere;
+import 'package:vector_math/vector_math.dart' hide Ray, Sphere, Plane;
 import 'material.dart';
 import 'dart:math';
 
@@ -138,6 +138,56 @@ class Sphere extends Geometry {
     final v = localNormal.y * 0.5 + 0.5;
     // ray directions
     final incomingDir = -h.r!.direction;
+
+    final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
+    mat.sample(si);
+    return si;
+  }
+}
+
+/// Plane is by default a 2d 1x1 square on the x-y plane, with center at the origin
+/// and with a face normal towards the positive z axis.
+class Plane extends Geometry {
+  Vector2 width;
+  Material mat;
+
+  Plane(Matrix4 modelWorld, Material mat, [Vector2? width])
+      : mat = mat,
+        width = width ?? Vector2.all(1) {
+    this.modelWorld = modelWorld;
+    this.worldModel = modelWorld.clone()..invert();
+  }
+
+  Hit intersect(Ray r) {
+    final modelRay = r.transform(worldModel);
+
+    // check if ray is pointing away from the plane (either from above or below)
+    var cosRayPlane = dot3(modelRay.direction, Vector3(0, 0, 1));
+    if ((modelRay.origin.z > 0 && cosRayPlane >= 0) || (modelRay.origin.z < 0 && cosRayPlane <= 0))
+      return Hit.none;
+
+    // since plane is at z=0, we need to find the t at which the ray's z component is 0;
+    final tLocal = cosRayPlane != 0 ? (modelRay.origin.z / cosRayPlane).abs() : 0.0;
+    final pLocal = modelRay.origin + modelRay.direction * tLocal;
+
+    // check plane extents
+    if ((pLocal.x < -width.x / 2 || pLocal.x > width.x / 2) ||
+        (pLocal.y < -width.y / 2 || pLocal.y > width.y / 2)) return Hit.none;
+
+    // world point and t
+    final p = modelWorld.transformed3(pLocal);
+    final t = dot3((p - r.origin), r.direction);
+
+    return Hit(t, r, this);
+  }
+
+  Interaction surface(Hit h) {
+    final worldNormal = transformDirection(modelWorld, Vector3(0, 0, 1));
+    final incomingDir = -h.r!.direction;
+    // texture coords
+    final pLocal = worldModel.transformed3(h.point!);
+    final u = (pLocal.x + width.x / 2.0) / width.x;
+    final v = (pLocal.y + width.y / 2.0) / width.y;
 
     final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
     mat.sample(si);
