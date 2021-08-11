@@ -105,11 +105,12 @@ Vector3 trace(Ray r, Scene s, Random rng) {
 /// A region on the final image. Currently they're always divided vertically,
 /// and regions are the full width of the image.
 class Region {
+  int id;
   int yStart;
   int yEnd;
   int width;
 
-  Region(this.yStart, this.yEnd, this.width);
+  Region(this.id, this.yStart, this.yEnd, this.width);
 }
 
 /// Data required to render each region.
@@ -120,6 +121,14 @@ class RegionJob {
   RayGenerator rayGenerator;
 
   RegionJob(this.r, this.samplesPerPixel, this.s, this.rayGenerator);
+}
+
+/// A progress update from a worker.
+class RegionProgress {
+  int id;
+  double progress;
+  RegionProgress(this.id, this.progress);
+  String toString() => '$id\t${(progress * 100).toStringAsFixed(1)}%';
 }
 
 /// The render results.
@@ -141,43 +150,46 @@ Future<void> renderParallel(Scene s, Camera c, int samplesPerPixel) async {
   final leftoverHeight = c.film.height % regions;
   final jobs = <RegionJob>[];
   for (var i = 0; i < regions; i++) {
-    var r = Region(i * regionHeight, (i + 1) * regionHeight, c.film.width);
+    var r = Region(i, i * regionHeight, (i + 1) * regionHeight, c.film.width);
     jobs.add(RegionJob(r, samplesPerPixel, s, c.getRayGenerator()));
   }
   if (leftoverHeight > 0) {
-    jobs.add(RegionJob(Region(jobs.last.r.yEnd, jobs.last.r.yEnd + leftoverHeight, c.film.width),
-        samplesPerPixel, s, c.getRayGenerator()));
+    jobs.add(RegionJob(
+        Region(jobs.length, jobs.last.r.yEnd, jobs.last.r.yEnd + leftoverHeight, c.film.width),
+        samplesPerPixel,
+        s,
+        c.getRayGenerator()));
   }
 
   // start worker pool
   var pool = WorkerPool<RegionJob>(workers, regionWorkFunction);
   await pool.start();
   pool.addAll(jobs);
+  final progress = <int, RegionProgress>{for (var j in jobs) j.r.id: RegionProgress(j.r.id, 0)};
 
   // listen on results stream
   print('Processing ${jobs.length} regions.');
-  var numComplete = 0;
   await for (var result in pool.results) {
-    result = result as RegionResult;
-    final r = result.r;
-    final colors = result.colors;
+    if (result is RegionProgress) {
+      progress[result.id] = result;
+      for (var k in progress.keys) print('${progress[k]}');
+      stdout.write('\x1b[${progress.length}A');
+    } else if (result is RegionResult) {
+      final r = result.r;
+      final colors = result.colors;
 
-    var index = 0;
-    for (var y = r.yStart; y < r.yEnd; y++) {
-      for (var x = 0; x < r.width; x++) {
-        c.film.setAt(x, y, colors[index++]);
+      var index = 0;
+      for (var y = r.yStart; y < r.yEnd; y++) {
+        for (var x = 0; x < r.width; x++) {
+          c.film.setAt(x, y, colors[index++]);
+        }
       }
+
+      pool.done(); // signal that a job was completed
     }
-
-    pool.done(); // signal that a job was completed
-    numComplete++;
-
-    final percentComplete = (numComplete.toDouble() / regions.toDouble()) * 100.0;
-    stdout.write(
-        '\r${percentComplete.toStringAsFixed(1)}% complete. $numComplete regions complete. ${pool.jobs} left.');
   }
   pool.stop();
-  print('');
+  print('\x1b[${progress.length}B');
 }
 
 /// Performs the work of actually rendering regions queued up in 'input'.
@@ -208,8 +220,10 @@ Future<void> regionWorkFunction(ReceivePort input, SendPort output) async {
         accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
         result.colors.add(accumlatedLight);
       }
+      // send progress update
+      output.send(RegionProgress(r.id, (1 + y - r.yStart) / (r.yEnd - r.yStart).toDouble()));
     }
-
+    // send region's rendered result
     output.send(result);
   }
 }
