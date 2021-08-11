@@ -77,8 +77,7 @@ Vector3 trace(Ray r, Scene s, Random rng) {
 
     // set working ray to next ray
     workingRay.direction = si.outgoingDir.clone();
-    workingRay.origin =
-        h.point!.clone() + workingRay.direction * 1e-3; // less than 1e-3 causes banding...
+    workingRay.origin = h.point! + workingRay.direction * 1e-3; // less than 1e-3 causes banding...
     // NOTE: in above, had to 'advance' the origin of the next ray a small bit along
     // the new direction. Without this, some weird black (no hit?) banding appeared
     // on the giant spheres making up the walls of the scene. I assume due to accumulated
@@ -89,8 +88,8 @@ Vector3 trace(Ray r, Scene s, Random rng) {
 
   var light = ambient.clone();
   for (var si in stack.reversed) {
-    // light transport equation: Lo = Le + ∫ f(p,wo,wi)* Li(p,wi) * cos(Θi) dw
-    si.transfer.multiply(light * dot3(si.outgoingDir, si.normal));
+    // light transport equation: Lo = Le + ∫ f(p,wo,wi)* Li(p,wi) * |cos(Θi)| dw
+    si.transfer.multiply(light * dot3(si.outgoingDir, si.normal).abs());
     light = si.emission + si.transfer;
   }
 

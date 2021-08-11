@@ -17,11 +17,9 @@ class MirrorMaterial extends Material {
   MirrorMaterial(this.baseColor);
 
   void sample(Interaction si, Random rng) {
-    // flipping normal doesn't *seem* to matter for reflect(), but i'll do
-    // it to be certain things are correct.
     si.outgoingDir = reflect(si.incomingDir, flipNormal(si.normal, si.incomingDir));
     si.emission = Vector3.zero();
-    si.transfer = baseColor.clone() / dot3(si.outgoingDir, si.normal);
+    si.transfer = baseColor.clone() / dot3(si.outgoingDir, si.normal).abs();
     si.pdf = 1.0;
   }
 }
@@ -55,14 +53,14 @@ class SpecularMaterial extends Material {
       // reflect
       si.outgoingDir = reflect(si.incomingDir, flipNormal(si.normal, si.incomingDir));
       si.pdf = F;
-      si.transfer = (baseColor.clone() * F) / dot3(si.outgoingDir, si.normal);
+      si.transfer = (baseColor.clone() * F) / dot3(si.outgoingDir, si.normal).abs();
       return;
     } else {
       // refract
       final T = 1.0 - F;
       si.outgoingDir = refract(si.incomingDir, si.normal, etaExternal, etaInternal);
       si.pdf = T;
-      si.transfer = (baseColor.clone() * T) / dot3(si.outgoingDir, si.normal);
+      si.transfer = (baseColor.clone() * T) / dot3(si.outgoingDir, si.normal).abs();
       return;
     }
   }
@@ -82,7 +80,7 @@ class DiffuseMaterial extends Material {
     si.outgoingDir = cosineSampleHemisphere(flipNormal(si.normal, si.incomingDir), rng);
     si.transfer = baseColor.clone()..multiply(tex.at(si.texCoords));
     si.emission = emitLight.clone();
-    si.pdf = dot3(si.outgoingDir, si.normal) / pi; // TODO: hmmm
+    si.pdf = dot3(si.outgoingDir, si.normal).abs() / pi; // TODO: hmmm
   }
 }
 

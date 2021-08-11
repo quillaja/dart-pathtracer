@@ -99,21 +99,7 @@ class Sphere extends Geometry {
     final a = 1.0; //dot3(rLocal.direction, rLocal.direction);
     final b = 2.0 * dot3(oc, rLocal.direction);
     final c = dot3(oc, oc) - 1.0;
-    /* // this part is replaced by quadratic() and the couple lines after.
-    final discriminant = b * b - 4.0 * a * c;
 
-    if (discriminant < 0.0) return Hit.none;
-
-    // local hit location
-    var tLocalMin = (-b + sqrt(discriminant)) / (2.0 * a);
-    var tLocalMax = (-b - sqrt(discriminant)) / (2.0 * a);
-    if (tLocalMin > tLocalMax) {
-      // swap if necessary
-      final temp = tLocalMin;
-      tLocalMin = tLocalMax;
-      tLocalMax = temp;
-    }
-    */
     final tVals = quadratic(a, b, c);
     if (tVals == null) return Hit.none;
     var tLocal = tVals.x;
@@ -132,9 +118,9 @@ class Sphere extends Geometry {
   Interaction surface(Hit h, Random rng) {
     // normal
     final localNormal = worldModel.transformed3(h.point!)..normalize();
-    final worldNormal = transformDirection(modelWorld, localNormal);
+    var worldNormal = transformDirection(modelWorld, localNormal);
     // texture coords (cylindrical)
-    final u = atan2(localNormal.x, localNormal.z) / (2 * pi) + 0.5;
+    final u = (atan2(localNormal.x, localNormal.z) + pi) / (2 * pi);
     final v = localNormal.y * 0.5 + 0.5;
     // ray directions
     final incomingDir = -h.r!.direction;
@@ -159,16 +145,16 @@ class Plane extends Geometry {
   }
 
   Hit intersect(Ray r) {
-    final modelRay = r.transform(worldModel);
+    final rLocal = r.transform(worldModel);
 
     // check if ray is pointing away from the plane (either from above or below)
-    var cosRayPlane = dot3(modelRay.direction, Vector3(0, 0, 1));
-    if ((modelRay.origin.z > 0 && cosRayPlane >= 0) || (modelRay.origin.z < 0 && cosRayPlane <= 0))
+    var cosRayPlane = dot3(rLocal.direction, Vector3(0, 0, 1));
+    if ((rLocal.origin.z > 0 && cosRayPlane >= 0) || (rLocal.origin.z < 0 && cosRayPlane <= 0))
       return Hit.none;
 
     // since plane is at z=0, we need to find the t at which the ray's z component is 0;
-    final tLocal = cosRayPlane != 0 ? (modelRay.origin.z / cosRayPlane).abs() : 0.0;
-    final pLocal = modelRay.origin + modelRay.direction * tLocal;
+    final tLocal = cosRayPlane != 0 ? (rLocal.origin.z / cosRayPlane).abs() : 0.0;
+    final pLocal = rLocal.origin + rLocal.direction * tLocal;
 
     // check plane extents
     if (!extent.contains(pLocal.xy)) return Hit.none;
@@ -213,4 +199,55 @@ class CircExtent extends Extent {
   bool contains(Vector2 p) => innerRadius <= p.length && p.length <= outerRadius;
   Vector2 uv(Vector2 p) => Vector2((atan2(p.y, p.x) + pi) / (2.0 * pi),
       1.0 - ((p.length - innerRadius) / (outerRadius - innerRadius)));
+}
+
+/// A cylinder with radius of 1, height of 1, and center at origin.
+class Cylinder extends Geometry {
+  final Material mat;
+
+  Cylinder(Matrix4 modelWorld, this.mat) {
+    this.modelWorld = modelWorld;
+    this.worldModel = modelWorld.clone()..invert();
+  }
+
+  Hit intersect(Ray r) {
+    final rLocal = r.transform(worldModel);
+    final a = rLocal.direction.x * rLocal.direction.x + rLocal.direction.y * rLocal.direction.y;
+    final b = 2.0 * (rLocal.direction.x * rLocal.origin.x + rLocal.direction.y * rLocal.origin.y);
+    final c = rLocal.origin.x * rLocal.origin.x + rLocal.origin.y * rLocal.origin.y - 1.0;
+
+    final tVals = quadratic(a, b, c);
+    if (tVals == null) return Hit.none;
+    var tLocal = tVals.x;
+    if (tLocal <= 0) tLocal = tVals.y;
+    var pLocal = rLocal.origin + rLocal.direction * tLocal;
+
+    // check intersection z-height
+    if (pLocal.z < -0.5 || pLocal.z > 0.5) {
+      if (tLocal == tVals.y) return Hit.none; // if far hit outsize z-bounds, done
+      tLocal = tVals.y; // bad-z-hit is near point, so try far hit point instead
+      pLocal = rLocal.origin + rLocal.direction * tLocal;
+      if (pLocal.z < -0.5 || pLocal.z > 0.5) return Hit.none; // far hit also beyond z-bounds. done
+    }
+
+    final p = modelWorld.transformed3(pLocal);
+    final t = dot3((p - r.origin), r.direction);
+
+    return Hit(t, r, this);
+  }
+
+  Interaction surface(Hit h, Random rng) {
+    // point and normal
+    final pLocal = worldModel.transformed3(h.point!);
+    final localNormal = Vector3(pLocal.x, pLocal.y, 0)..normalize();
+    final worldNormal = transformDirection(modelWorld, localNormal);
+    // texCoord
+    final u = (atan2(pLocal.y, pLocal.x) + pi) / (2 * pi);
+    final v = pLocal.z + 0.5; // pLocal.z should be in [-0.5, 0.5]
+
+    final incomingDir = -h.r!.direction;
+    final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
+    mat.sample(si, rng);
+    return si;
+  }
 }
