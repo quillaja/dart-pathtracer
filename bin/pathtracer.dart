@@ -14,24 +14,37 @@ void main(List<String> arguments) async {
 
   const wallRadius = 5000.0;
   var s = Scene([
-    // upper ball
-    // Sphere(Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
-    // MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
-    // SpecularMaterial(Vector3(0.95, 0.95, 0.95), false, 1.0, 1.5)), // glass
+    // left object(s)
+    Sphere(
+        Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
+        // MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
+        SpecularMaterial(Vector3.all(1), false, 1.0, 1.5)), // glass
 
     Plane(
-        Matrix4.compose(Vector3(-4, 0, 0),
-            Quaternion.axisAngle(Vector3(0, 1, -0.2)..normalize(), 3 * pi / 4), Vector3.all(1)),
-        MixMaterial([
-          DiffuseMaterial(Vector3.all(0.95), GridTexture(4, 1e-2)),
-          MirrorMaterial(Vector3.all(0.95))
-        ]),
-        Vector2(7, 5)),
+        Matrix4.compose(
+            Vector3(-4, 0, 0),
+            Quaternion.axisAngle(Vector3(0, 1, -0.4)..normalize(), 3 * pi / 4 - 2 * pi),
+            Vector3.all(1)),
+        // MixMaterial([
+        DiffuseMaterial(Vector3.all(0.95), GridTexture(4, 1e-2)),
+        // SpecularMaterial(Vector3.all(0.95), false, 1, 3),
+        // DiffuseMaterial(Vector3.all(0.95), ImageTexture(textureImage)),
+        // MirrorMaterial(Vector3.all(0.95)),
+        // ]),
+        // DiffuseMaterial.emitter(Vector3.all(5)),
+        RectExtent(Vector2(7, 5))),
+    // CircExtent(1, 4)),
 
-    // lower ball
-    Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
-        SpecularMaterial(Vector3.all(1), false, 1.0, 1.5)), // glass
-    // DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))), // texture
+    // right object(s)
+    Cylinder(
+        Matrix4.compose(
+            Vector3(-1, -1, -2), Quaternion.axisAngle(Vector3(1, 0, 0), 0), Vector3(1, 1, 1)),
+        // DiffuseMaterial(Vector3.all(0.95), ImageTexture(textureImage))),
+        // MirrorMaterial(Vector3.all(0.95))),
+        // Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
+        // SpecularMaterial(Vector3(0.95, 0.95, 0.95), false, 1.0, 2)), // glass
+        DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))), // texture
+    // DiffuseMaterial(Vector3(0.95, 0.95, 0.95), GridTexture(4, 1e-2))), // texture
     // Sphere(
     //     Matrix4.compose(Vector3(-1, -2, -2),
     //         Quaternion.axisAngle(Vector3(0, 1, 0)..normalize(), pi), Vector3.all(1)),
@@ -48,6 +61,7 @@ void main(List<String> arguments) async {
         Matrix4.compose(
             Vector3(0, -(wallRadius + 3), 0), Quaternion.identity(), Vector3.all(wallRadius)),
         DiffuseMaterial(Vector3(0.7, 0.7, 0.7), ImageTexture(textureImage))),
+    // DiffuseMaterial(Vector3(0.7, 0.7, 0.7))),
 
     // Left wall (blueish) +Z
     Sphere(
@@ -72,6 +86,16 @@ void main(List<String> arguments) async {
         Matrix4.compose(
             Vector3(wallRadius + 10, 0, 0), Quaternion.identity(), Vector3.all(wallRadius)),
         DiffuseMaterial(Vector3(0.7, 0.7, 0.7))),
+
+    // light behind camera
+    Plane(
+        Matrix4.compose(
+            Vector3(4, 2, 0),
+            Quaternion.axisAngle(Vector3(0, 1, 0), -pi / 2) *
+                Quaternion.axisAngle(Vector3(0, 0, 1), -pi / 6),
+            Vector3.all(1)),
+        DiffuseMaterial.emitter(Vector3.all(5)),
+        CircExtent(0, 3)),
   ]);
 
   final width = arguments.length >= 1 ? int.parse(arguments[0]) : 200;
@@ -80,7 +104,7 @@ void main(List<String> arguments) async {
   final filename = arguments.length >= 4 ? arguments[3] : 'image.png';
 
   var film = Film(width, height);
-  var cam = Camera(Vector3(3, 2, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 2.0, film);
+  var cam = Camera(Vector3(3, 2, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 3.0, film);
 
   final start = DateTime.now();
   await renderParallel(s, cam, samplesPerPixel);

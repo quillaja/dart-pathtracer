@@ -126,8 +126,18 @@ class RegionJob {
 class RegionProgress {
   int id;
   double progress;
-  RegionProgress(this.id, this.progress);
-  String toString() => '$id\t${(progress * 100).toStringAsFixed(1)}%';
+  Duration left;
+  RegionProgress(this.id, this.progress, this.left);
+
+  static final int col1 = 6;
+  static final int col2 = 10;
+  static final int col3 = 12;
+
+  static String header() =>
+      'region'.padLeft(col1) + 'done'.padLeft(col2 + 1) + 'h:m:s left'.padLeft(col3);
+
+  String toString() =>
+      '${id.toString().padLeft(col1)}${(progress * 100).toStringAsFixed(1).padLeft(col2)}%${fmtHMS(left).padLeft(col3)}';
 }
 
 /// The render results.
@@ -164,10 +174,13 @@ Future<void> renderParallel(Scene s, Camera c, int samplesPerPixel) async {
   var pool = WorkerPool<RegionJob>(workers, regionWorkFunction);
   await pool.start();
   pool.addAll(jobs);
-  final progress = <int, RegionProgress>{for (var j in jobs) j.r.id: RegionProgress(j.r.id, 0)};
+  final progress = <int, RegionProgress>{
+    for (var j in jobs) j.r.id: RegionProgress(j.r.id, 0, Duration.zero)
+  };
 
   // listen on results stream
   print('Processing ${jobs.length} regions.');
+  print(RegionProgress.header());
   await for (var result in pool.results) {
     if (result is RegionProgress) {
       progress[result.id] = result;
@@ -204,6 +217,7 @@ Future<void> regionWorkFunction(ReceivePort input, SendPort output) async {
 
     final result = RegionResult(r, <Vector3>[]);
 
+    final start = DateTime.now();
     for (double y = r.yStart.toDouble(); y < r.yEnd; y++) {
       for (double x = 0.0; x < r.width; x++) {
         var accumlatedLight = Vector3.zero();
@@ -219,8 +233,15 @@ Future<void> regionWorkFunction(ReceivePort input, SendPort output) async {
         accumlatedLight.scale(1.0 / samplesPerPixel.toDouble());
         result.colors.add(accumlatedLight);
       }
+
+      // figure out estimate for %done and remaining time
+      final rowsDone = (1 + y - r.yStart);
+      final took = DateTime.now().difference(start);
+      final usPerRow = took.inMicroseconds.toDouble() / rowsDone;
+      final left = Duration(microseconds: (usPerRow * (r.yEnd - y - 1)).toInt());
+      final done = rowsDone / (r.yEnd - r.yStart).toDouble();
       // send progress update
-      output.send(RegionProgress(r.id, (1 + y - r.yStart) / (r.yEnd - r.yStart).toDouble()));
+      output.send(RegionProgress(r.id, done, left));
     }
     // send region's rendered result
     output.send(result);
