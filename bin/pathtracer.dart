@@ -14,41 +14,43 @@ void main(List<String> arguments) async {
 
   const wallRadius = 5000.0;
   var s = Scene([
+    TriangleMesh.cube(Matrix4.rotationZ(-pi / 12) * Matrix4.rotationY(pi / 4),
+        DiffuseMaterial(Vector3.all(0.95), ImageTexture(textureImage))),
     // left object(s)
-    Sphere(
-        Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
-        // MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
-        SpecularMaterial(Vector3.all(1), false, 1.0, 1.5)), // glass
+    // Sphere(
+    //     Matrix4.compose(Vector3(-2, -1, 1), Quaternion.identity(), Vector3.all(1)),
+    // MirrorMaterial(Vector3(0.95, 0.95, 0.95))), // basic mirror
+    // SpecularMaterial(Vector3.all(1), false, 1.0, 1.5)), // glass
 
-    Plane(
-        Matrix4.compose(
-            Vector3(-4, 0, 0),
-            Quaternion.axisAngle(Vector3(0, 1, -0.4)..normalize(), 3 * pi / 4 - 2 * pi),
-            Vector3.all(1)),
-        // MixMaterial([
-        DiffuseMaterial(Vector3.all(0.95), GridTexture(4, 1e-2)),
-        // SpecularMaterial(Vector3.all(0.95), false, 1, 3),
-        // DiffuseMaterial(Vector3.all(0.95), ImageTexture(textureImage)),
-        // MirrorMaterial(Vector3.all(0.95)),
-        // ]),
-        // DiffuseMaterial.emitter(Vector3.all(5)),
-        RectExtent(Vector2(7, 5))),
+    // Plane(
+    //     Matrix4.compose(
+    //         Vector3(-4, 0, 0),
+    //         Quaternion.axisAngle(Vector3(0, 1, -0.4)..normalize(), 3 * pi / 4 - 2 * pi),
+    //         Vector3.all(1)),
+    //     // MixMaterial([
+    //     DiffuseMaterial(Vector3.all(0.95), GridTexture(4, 1e-2)),
+    //     // SpecularMaterial(Vector3.all(0.95), false, 1, 3),
+    //     // DiffuseMaterial(Vector3.all(0.95), ImageTexture(textureImage)),
+    //     // MirrorMaterial(Vector3.all(0.95)),
+    //     // ]),
+    //     // DiffuseMaterial.emitter(Vector3.all(5)),
+    //     RectExtent(Vector2(7, 5))),
     // CircExtent(1, 4)),
 
     // right object(s)
-    Cylinder(
-        Matrix4.compose(
-            Vector3(-1, -1, -2), Quaternion.axisAngle(Vector3(1, 0, 0), 0), Vector3(1, 1, 1)),
-        // DiffuseMaterial(Vector3.all(0.95), ImageTexture(textureImage))),
-        // MirrorMaterial(Vector3.all(0.95))),
-        // Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
-        // SpecularMaterial(Vector3(0.95, 0.95, 0.95), false, 1.0, 2)), // glass
-        DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))), // texture
+    // Cylinder(
+    //     Matrix4.compose(
+    //         Vector3(-1, -1, -2), Quaternion.axisAngle(Vector3(1, 0, 0), 0), Vector3(1, 1, 1)),
+    // DiffuseMaterial(Vector3.all(0.95), ImageTexture(textureImage))),
+    // MirrorMaterial(Vector3.all(0.95))),
+    // Sphere(Matrix4.translation(Vector3(-1, -2, -2)),
+    // DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))), // texture
     // DiffuseMaterial(Vector3(0.95, 0.95, 0.95), GridTexture(4, 1e-2))), // texture
     // Sphere(
-    //     Matrix4.compose(Vector3(-1, -2, -2),
+    //     Matrix4.compose(Vector3(-1, -1, -2),
     //         Quaternion.axisAngle(Vector3(0, 1, 0)..normalize(), pi), Vector3.all(1)),
-    //     DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))),
+    //     SpecularMaterial(Vector3(0.95, 0.95, 0.95), false, 1.0, 1.5)), // glass
+    // DiffuseMaterial(Vector3(0.95, 0.95, 0.95), ImageTexture(textureImage))),
 
     // large white top light
     Sphere(
@@ -98,13 +100,13 @@ void main(List<String> arguments) async {
         CircExtent(0, 3)),
   ]);
 
-  final width = arguments.length >= 1 ? int.parse(arguments[0]) : 200;
-  final height = arguments.length >= 2 ? int.parse(arguments[1]) : 200;
+  final width = arguments.length >= 1 ? int.parse(arguments[0]) : 400;
+  final height = arguments.length >= 2 ? int.parse(arguments[1]) : 300;
   final samplesPerPixel = arguments.length >= 3 ? int.parse(arguments[2]) : 16;
   final filename = arguments.length >= 4 ? arguments[3] : 'image.png';
 
   var film = Film(width, height);
-  var cam = Camera(Vector3(3, 2, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 3.0, film);
+  var cam = Camera(Vector3(3, 2, 0), Vector3.zero(), Vector3(0, 1, 0), pi / 6.0, film);
 
   final start = DateTime.now();
   await renderParallel(s, cam, samplesPerPixel);

@@ -72,6 +72,14 @@ class DiffuseMaterial extends Material {
   Texture tex = Texture();
 
   DiffuseMaterial(this.baseColor, [Texture? tex]) : tex = tex ?? Texture();
+
+  /// In the current implementation, "emitLight" is (i think!) in units of "Talbot", which is
+  /// Lumen * second. The current camera doesn't specify an "exposure time", so it could be assumed
+  /// as 1s. Thus, "emitLight" is also in Lumen (Lumen/1s).
+  ///
+  /// TODO: add exposure time to camera, make lights take units of Lumen. Then camera will
+  /// sum all recieved lumen and "develop" by multiplying per-pixel lumen * exposure time,
+  /// clamping the result and converting to RGB as normal.
   DiffuseMaterial.emitter(this.emitLight);
 
   void sample(Interaction si, Random rng) {

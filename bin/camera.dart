@@ -37,6 +37,7 @@ class Film {
       ];
 
   Image develop() {
+    // TODO: add "exposure time". See note in DiffuseMateria.emitter().
     final img = Image(width, height);
     // final extremes = _extrema();
     // print(extremes);
