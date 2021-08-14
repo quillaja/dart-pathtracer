@@ -4,13 +4,13 @@ import 'dart:math';
 
 class Hit {
   double t;
-  Ray? r;
   Vector3? point;
+  Vector3? incomingDir;
+  Vector3? normal;
+  Vector2? uv;
   Geometry? object;
 
-  Hit(this.t, [this.r, this.object]) {
-    this.point = r == null ? null : r!.origin + r!.direction * t;
-  }
+  Hit(this.t, [this.point, this.incomingDir, this.normal, this.uv, this.object]);
 
   static final none = Hit(double.infinity);
 }
@@ -112,20 +112,18 @@ class Sphere extends Geometry {
     final p = modelWorld.transformed3(pLocal);
     final t = dot3((p - r.origin), r.direction);
 
-    return Hit(t, r, this);
+    // texture coords (cylindrical)
+    final localNormal = pLocal..normalized();
+    final u = (atan2(localNormal.x, localNormal.z) + pi) / (2 * pi);
+    final v = localNormal.y * 0.5 + 0.5;
+
+    final worldNormal = transformDirection(modelWorld, localNormal);
+
+    return Hit(t, p, -r.direction, worldNormal, Vector2(u, v), this);
   }
 
   Interaction surface(Hit h, Random rng) {
-    // normal
-    final localNormal = worldModel.transformed3(h.point!)..normalize();
-    var worldNormal = transformDirection(modelWorld, localNormal);
-    // texture coords (cylindrical)
-    final u = (atan2(localNormal.x, localNormal.z) + pi) / (2 * pi);
-    final v = localNormal.y * 0.5 + 0.5;
-    // ray directions
-    final incomingDir = -h.r!.direction;
-
-    final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
+    final si = Interaction(h.normal!, h.incomingDir!, h.uv!);
     mat.sample(si, rng);
     return si;
   }
@@ -163,17 +161,16 @@ class Plane extends Geometry {
     final p = modelWorld.transformed3(pLocal);
     final t = dot3((p - r.origin), r.direction);
 
-    return Hit(t, r, this);
+    // texture coords
+    final uv = extent.uv(pLocal.xy);
+    // normal
+    final worldNormal = transformDirection(modelWorld, Vector3(0, 0, 1));
+
+    return Hit(t, p, -r.direction, worldNormal, uv, this);
   }
 
   Interaction surface(Hit h, Random rng) {
-    final worldNormal = transformDirection(modelWorld, Vector3(0, 0, 1));
-    final incomingDir = -h.r!.direction;
-    // texture coords
-    final pLocal = worldModel.transformed3(h.point!);
-    final uv = extent.uv(pLocal.xy);
-
-    final si = Interaction(worldNormal, incomingDir, uv);
+    final si = Interaction(h.normal!, h.incomingDir!, h.uv!);
     mat.sample(si, rng);
     return si;
   }
@@ -230,24 +227,242 @@ class Cylinder extends Geometry {
       if (pLocal.z < -0.5 || pLocal.z > 0.5) return Hit.none; // far hit also beyond z-bounds. done
     }
 
+    // world point and t
     final p = modelWorld.transformed3(pLocal);
     final t = dot3((p - r.origin), r.direction);
 
-    return Hit(t, r, this);
-  }
-
-  Interaction surface(Hit h, Random rng) {
-    // point and normal
-    final pLocal = worldModel.transformed3(h.point!);
-    final localNormal = Vector3(pLocal.x, pLocal.y, 0)..normalize();
-    final worldNormal = transformDirection(modelWorld, localNormal);
     // texCoord
     final u = (atan2(pLocal.y, pLocal.x) + pi) / (2 * pi);
     final v = pLocal.z + 0.5; // pLocal.z should be in [-0.5, 0.5]
+    // normal
+    final worldNormal = transformDirection(modelWorld, Vector3(pLocal.x, pLocal.y, 0)..normalize());
 
-    final incomingDir = -h.r!.direction;
-    final si = Interaction(worldNormal, incomingDir, Vector2(u, v));
+    return Hit(t, p, -r.direction, worldNormal, Vector2(u, v), this);
+  }
+
+  Interaction surface(Hit h, Random rng) {
+    final si = Interaction(h.normal!, h.incomingDir!, h.uv!);
     mat.sample(si, rng);
     return si;
+  }
+}
+
+/// find max dimension of vector. result is index in [0,2].
+/// https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Vectors#Vector3::MaxDimension
+int MaxDimension(Vector3 v) => (v.x > v.y) ? ((v.x > v.z) ? 0 : 2) : ((v.y > v.z) ? 1 : 2);
+
+/// rearrange vector components.
+/// https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Points#Point3::Permute
+Vector3 Permute(Vector3 v, int x, int y, int z) => Vector3(v[x], v[y], v[z]);
+
+/// returns 3 barycentric weights and 1 t-value as Vector4(b0, b1, b1, t).
+/// returns null if no intersection.
+/// https://www.pbr-book.org/3ed-2018/Shapes/Triangle_Meshes#fragment-Performray--triangleintersectiontest-0
+Vector4? rayTriangleIntersection(Ray ray, Vector3 p0, Vector3 p1, Vector3 p2) {
+  // <<Transform triangle vertices to ray coordinate space>>
+  //  <<Translate vertices based on ray origin>>
+  Vector3 p0t = p0 - ray.origin;
+  Vector3 p1t = p1 - ray.origin;
+  Vector3 p2t = p2 - ray.origin;
+  //  <<Permute components of triangle vertices and ray direction>>
+  int kz = MaxDimension(ray.direction.clone()..absolute());
+  int kx = kz + 1;
+  if (kx == 3) kx = 0;
+  int ky = kx + 1;
+  if (ky == 3) ky = 0;
+  Vector3 d = Permute(ray.direction, kx, ky, kz);
+  p0t = Permute(p0t, kx, ky, kz);
+  p1t = Permute(p1t, kx, ky, kz);
+  p2t = Permute(p2t, kx, ky, kz);
+  //  <<Apply shear transformation to translated vertex positions>>
+  double Sx = -d.x / d.z;
+  double Sy = -d.y / d.z;
+  double Sz = 1.0 / d.z;
+  p0t.x += Sx * p0t.z;
+  p0t.y += Sy * p0t.z;
+  p1t.x += Sx * p1t.z;
+  p1t.y += Sy * p1t.z;
+  p2t.x += Sx * p2t.z;
+  p2t.y += Sy * p2t.z;
+
+  // <<Compute edge function coefficients e0, e1, and e2>>
+  double e0 = p1t.x * p2t.y - p1t.y * p2t.x;
+  double e1 = p2t.x * p0t.y - p2t.y * p0t.x;
+  double e2 = p0t.x * p1t.y - p0t.y * p1t.x;
+
+  // <<Perform triangle edge and determinant tests>>
+  if ((e0 < 0 || e1 < 0 || e2 < 0) && (e0 > 0 || e1 > 0 || e2 > 0)) return null;
+  double det = e0 + e1 + e2;
+  if (det == 0) return null;
+
+  // <<Compute scaled hit distance to triangle and test against ray  range>>
+  p0t.z *= Sz;
+  p1t.z *= Sz;
+  p2t.z *= Sz;
+  double tScaled = e0 * p0t.z + e1 * p1t.z + e2 * p2t.z;
+  if (det < 0 && tScaled >= 0)
+    return null;
+  else if (det > 0 && tScaled <= 0) return null;
+
+  // <<Compute barycentric coordinates and  value for triangle intersection>>
+  double invDet = 1 / det;
+  double b0 = e0 * invDet;
+  double b1 = e1 * invDet;
+  double b2 = e2 * invDet;
+  double t = tScaled * invDet;
+
+  return Vector4(b0, b1, b2, t);
+}
+
+class Vert {
+  int p;
+  int n;
+  int uv;
+  Vert(this.p, this.n, this.uv);
+}
+
+class TriangleMesh extends Geometry {
+  final Material mat;
+  List<Vert> triangles = <Vert>[];
+  List<Vector3> points = <Vector3>[];
+  List<Vector3> normals = <Vector3>[];
+  List<Vector2> uvs = <Vector2>[];
+
+  TriangleMesh(Matrix4 modelWorld, this.triangles, this.points, this.normals, this.uvs, this.mat) {
+    this.modelWorld = modelWorld;
+    this.worldModel = modelWorld.clone()..invert();
+  }
+
+  Hit intersect(Ray r) {
+    // ray to model space, then test the ray against each triangle.
+    final rLocal = r.transform(worldModel);
+    var tLocal = double.infinity;
+    var minb = Vector4.zero();
+    var mini = -1;
+    for (var i = 0; i < triangles.length; i += 3) {
+      final b = rayTriangleIntersection(
+          rLocal, points[triangles[i].p], points[triangles[i + 1].p], points[triangles[i + 2].p]);
+      if (b != null && b.w < tLocal) {
+        tLocal = b.w;
+        minb = b;
+        mini = i;
+      }
+    }
+    if (tLocal == double.infinity) return Hit.none;
+
+    // there was a hit.
+    // use barycentric coords to find point, normal, uv by performing a
+    // weighted average of the corresponding attributes from each vertex.
+    final pLocal = points[triangles[mini].p] * minb.x +
+        points[triangles[mini + 1].p] * minb.y +
+        points[triangles[mini + 2].p] * minb.z;
+    final localNormal = normals[triangles[mini].n] * minb.x +
+        normals[triangles[mini + 1].n] * minb.y +
+        normals[triangles[mini + 2].n] * minb.z;
+    final uv = uvs[triangles[mini].uv] * minb.x +
+        uvs[triangles[mini + 1].uv] * minb.y +
+        uvs[triangles[mini + 2].uv] * minb.z;
+
+    // world point, t, and normal
+    final p = modelWorld.transformed3(pLocal);
+    final t = dot3((p - r.origin), r.direction);
+    final worldNormal = transformDirection(modelWorld, localNormal);
+
+    return Hit(t, p, -r.direction, worldNormal, uv, this);
+  }
+
+  Interaction surface(Hit h, Random rng) {
+    final si = Interaction(h.normal!, h.incomingDir!, h.uv!);
+    mat.sample(si, rng);
+    return si;
+  }
+
+  TriangleMesh.cube(Matrix4 modelWorld, this.mat) {
+    this.modelWorld = modelWorld;
+    this.worldModel = modelWorld.clone()..invert();
+
+    this.points = [
+      Vector3(0, 0, 0),
+      Vector3(1, 0, 0),
+      Vector3(0, 1, 0),
+      Vector3(1, 1, 0),
+      Vector3(0, 0, 1), //4
+      Vector3(1, 0, 1),
+      Vector3(0, 1, 1),
+      Vector3(1, 1, 1),
+    ];
+    this.points.forEach((p) => p.sub(Vector3.all(0.5))); // translate center to origin
+
+    this.normals = <Vector3>[
+      Vector3(1, 0, 0),
+      Vector3(0, 1, 0),
+      Vector3(0, 0, 1),
+      Vector3(-1, 0, 0),
+      Vector3(0, -1, 0),
+      Vector3(0, 0, -1),
+    ];
+
+    this.uvs = [
+      Vector2(0, 0),
+      Vector2(1, 0),
+      Vector2(0, 1),
+      Vector2(1, 1),
+    ];
+
+    this.triangles = [
+      // -z face
+      Vert(0, 5, 1),
+      Vert(1, 5, 0),
+      Vert(2, 5, 3),
+
+      Vert(2, 5, 3),
+      Vert(1, 5, 0),
+      Vert(3, 5, 2),
+
+      // +z face
+      Vert(5, 2, 1),
+      Vert(4, 2, 0),
+      Vert(7, 2, 3),
+
+      Vert(7, 2, 3),
+      Vert(4, 2, 0),
+      Vert(6, 2, 2),
+
+      // -y face
+      Vert(0, 4, 0),
+      Vert(4, 4, 1),
+      Vert(1, 4, 2),
+
+      Vert(1, 4, 2),
+      Vert(4, 4, 1),
+      Vert(5, 4, 3),
+
+      // +y face
+      Vert(2, 1, 2),
+      Vert(3, 1, 3),
+      Vert(6, 1, 0),
+
+      Vert(3, 1, 3),
+      Vert(6, 1, 0),
+      Vert(7, 1, 1),
+
+      // -x face
+      Vert(0, 3, 0),
+      Vert(2, 3, 2),
+      Vert(6, 3, 3),
+
+      Vert(4, 3, 1),
+      Vert(0, 3, 0),
+      Vert(6, 3, 3),
+
+      // +x face
+      Vert(5, 0, 0),
+      Vert(1, 0, 1),
+      Vert(7, 0, 2),
+
+      Vert(3, 0, 3),
+      Vert(1, 0, 1),
+      Vert(7, 0, 2),
+    ];
   }
 }
