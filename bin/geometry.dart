@@ -2,6 +2,8 @@ import 'package:vector_math/vector_math.dart' hide Ray, Sphere, Plane;
 import 'material.dart';
 import 'dart:math';
 
+import 'wavefront_obj.dart';
+
 class Hit {
   double t;
   Vector3? point;
@@ -41,6 +43,46 @@ class Ray {
       Ray(tmatrix.transformed3(origin), transformDirection(tmatrix, direction));
 
   Ray clone() => Ray(origin.clone(), direction.clone());
+
+  double? intersectsWithAabb3(Aabb3 other) {
+    // from https://pub.dev/documentation/vector_math/latest/vector_math/Ray/intersectsWithAabb3.html
+    final otherMin = other.min;
+    final otherMax = other.max;
+
+    var tNear = -double.maxFinite;
+    var tFar = double.maxFinite;
+
+    for (var i = 0; i < 3; ++i) {
+      if (direction[i] == 0.0) {
+        if (origin[i] < otherMin[i] || origin[i] > otherMax[i]) {
+          return null;
+        }
+      } else {
+        var t1 = (otherMin[i] - origin[i]) / direction[i];
+        var t2 = (otherMax[i] - origin[i]) / direction[i];
+
+        if (t1 > t2) {
+          final temp = t1;
+          t1 = t2;
+          t2 = temp;
+        }
+
+        if (t1 > tNear) {
+          tNear = t1;
+        }
+
+        if (t2 < tFar) {
+          tFar = t2;
+        }
+
+        if (tNear > tFar || tFar < 0) {
+          return null;
+        }
+      }
+    }
+
+    return tNear;
+  }
 }
 
 Vector3 transformDirection(Matrix4 mat, Vector3 dir) {
@@ -82,18 +124,25 @@ abstract class Geometry {
 
   Hit intersect(Ray r);
   Interaction surface(Hit h, Random rng);
+  // Aabb3 getBound(); // in model space (for now?)
 }
 
+/// A unit sphere centered at the origin.
 class Sphere extends Geometry {
   Material mat;
+  Aabb3 bounds;
 
-  Sphere(Matrix4 modelWorld, Material material) : mat = material {
+  Sphere(Matrix4 modelWorld, Material material)
+      : mat = material,
+        bounds = Aabb3.minMax(Vector3.all(-1), Vector3.all(1)) {
     this.modelWorld = modelWorld;
     this.worldModel = modelWorld.clone()..invert();
   }
 
   Hit intersect(Ray r) {
     final rLocal = r.transform(worldModel);
+    final bTLocal = rLocal.intersectsWithAabb3(bounds);
+    if (bTLocal == null || bTLocal < 0) return Hit.none;
 
     final oc = rLocal.origin;
     final a = 1.0; //dot3(rLocal.direction, rLocal.direction);
@@ -134,16 +183,23 @@ class Sphere extends Geometry {
 class Plane extends Geometry {
   Material mat;
   Extent extent;
+  Aabb3 bound;
+
+  static final double boundZWidth = 1e-6;
 
   Plane(Matrix4 modelWorld, Material mat, [Extent? extent])
       : mat = mat,
+        bound = Aabb3.minMax(Vector3(-0.5, -0.5, -boundZWidth), Vector3(0.5, 0.5, boundZWidth)),
         extent = extent ?? RectExtent(Vector2.all(1)) {
     this.modelWorld = modelWorld;
     this.worldModel = modelWorld.clone()..invert();
+    if (extent != null) bound = extent.getBound();
   }
 
   Hit intersect(Ray r) {
     final rLocal = r.transform(worldModel);
+    final bTLocal = rLocal.intersectsWithAabb3(bound);
+    if (bTLocal == null || bTLocal < 0) return Hit.none;
 
     // check if ray is pointing away from the plane (either from above or below)
     var cosRayPlane = dot3(rLocal.direction, Vector3(0, 0, 1));
@@ -179,6 +235,7 @@ class Plane extends Geometry {
 abstract class Extent {
   bool contains(Vector2 p);
   Vector2 uv(Vector2 p);
+  Aabb3 getBound();
 }
 
 class RectExtent extends Extent {
@@ -187,6 +244,8 @@ class RectExtent extends Extent {
   bool contains(Vector2 p) =>
       (-width.x / 2 <= p.x && p.x <= width.x / 2) && (-width.y / 2 <= p.y && p.y <= width.y / 2);
   Vector2 uv(Vector2 p) => (p + width / 2.0)..divide(width);
+  Aabb3 getBound() => Aabb3.minMax(Vector3(-width.x / 2, -width.y / 2, -Plane.boundZWidth),
+      Vector3(width.x / 2, width.y / 2, Plane.boundZWidth));
 }
 
 class CircExtent extends Extent {
@@ -196,19 +255,26 @@ class CircExtent extends Extent {
   bool contains(Vector2 p) => innerRadius <= p.length && p.length <= outerRadius;
   Vector2 uv(Vector2 p) => Vector2((atan2(p.y, p.x) + pi) / (2.0 * pi),
       1.0 - ((p.length - innerRadius) / (outerRadius - innerRadius)));
+  Aabb3 getBound() => Aabb3.minMax(Vector3(-outerRadius, -outerRadius, -Plane.boundZWidth),
+      Vector3(outerRadius, outerRadius, Plane.boundZWidth));
 }
 
 /// A cylinder with radius of 1, height of 1, and center at origin.
 class Cylinder extends Geometry {
   final Material mat;
+  Aabb3 bound;
 
-  Cylinder(Matrix4 modelWorld, this.mat) {
+  Cylinder(Matrix4 modelWorld, this.mat)
+      : bound = Aabb3.minMax(Vector3(-1, -1, -0.5), Vector3(1, 1, 0.5)) {
     this.modelWorld = modelWorld;
     this.worldModel = modelWorld.clone()..invert();
   }
 
   Hit intersect(Ray r) {
     final rLocal = r.transform(worldModel);
+    final bTLocal = rLocal.intersectsWithAabb3(bound);
+    if (bTLocal == null || bTLocal < 0) return Hit.none;
+
     final a = rLocal.direction.x * rLocal.direction.x + rLocal.direction.y * rLocal.direction.y;
     final b = 2.0 * (rLocal.direction.x * rLocal.origin.x + rLocal.direction.y * rLocal.origin.y);
     final c = rLocal.origin.x * rLocal.origin.x + rLocal.origin.y * rLocal.origin.y - 1.0;
@@ -323,6 +389,7 @@ class Vert {
 
 class TriangleMesh extends Geometry {
   final Material mat;
+  Aabb3 bound = Aabb3();
   List<Vert> triangles = <Vert>[];
   List<Vector3> points = <Vector3>[];
   List<Vector3> normals = <Vector3>[];
@@ -331,11 +398,30 @@ class TriangleMesh extends Geometry {
   TriangleMesh(Matrix4 modelWorld, this.triangles, this.points, this.normals, this.uvs, this.mat) {
     this.modelWorld = modelWorld;
     this.worldModel = modelWorld.clone()..invert();
+
+    _determineBound();
   }
 
+  TriangleMesh.fromObjData(Matrix4 modelWorld, Material mat, ObjData obj)
+      : this(
+            modelWorld,
+            obj.groups.values
+                .map((g) => g.faces)
+                .expand((faceList) => faceList)
+                .expand((f) => f.indices)
+                .map((i) => Vert(i.v, i.vn, i.vt))
+                .toList(growable: false),
+            obj.vertices,
+            obj.normals,
+            obj.uvs.map((element) => element.xy).toList(growable: false),
+            mat);
+
   Hit intersect(Ray r) {
-    // ray to model space, then test the ray against each triangle.
+    // ray to model space, test against the bounds, then test the ray against each triangle.
     final rLocal = r.transform(worldModel);
+    final bTLocal = rLocal.intersectsWithAabb3(bound);
+    if (bTLocal == null || bTLocal < 0) return Hit.none;
+
     var tLocal = double.infinity;
     var minb = Vector4.zero();
     var mini = -1;
@@ -375,6 +461,20 @@ class TriangleMesh extends Geometry {
     final si = Interaction(h.normal!, h.incomingDir!, h.uv!);
     mat.sample(si, rng);
     return si;
+  }
+
+  void _determineBound() {
+    final bMin = this.points.reduce((value, element) {
+      var rval = Vector3.zero();
+      Vector3.min(value, element, rval);
+      return rval;
+    });
+    final bMax = this.points.reduce((value, element) {
+      var rval = Vector3.zero();
+      Vector3.max(value, element, rval);
+      return rval;
+    });
+    bound = Aabb3.minMax(bMin, bMax);
   }
 
   TriangleMesh.cube(Matrix4 modelWorld, this.mat) {
@@ -464,5 +564,7 @@ class TriangleMesh extends Geometry {
       Vert(1, 0, 1),
       Vert(7, 0, 2),
     ];
+
+    _determineBound();
   }
 }
