@@ -133,8 +133,13 @@ class ImageTexture extends Texture {
   ImageTexture(this.image, [Interpolation interpolation = Interpolation.linear])
       : _interpolation = interpolation;
 
-  Vector3 at(Vector2 texCoord) => colorV3(image.getPixelInterpolate(
-      texCoord.x * image.width, (1.0 - texCoord.y) * image.height, _interpolation));
+  Vector3 at(Vector2 texCoord) {
+    // correct coordinates outside of [0,1]
+    final x = texCoord.x >= 0.0 && texCoord.x <= 1.0 ? texCoord.x : texCoord.x % 1.0;
+    final y = texCoord.y >= 0.0 && texCoord.y <= 1.0 ? texCoord.y : texCoord.y % 1.0;
+    return colorV3(
+        image.getPixelInterpolate(x * image.width, (1.0 - y) * image.height, _interpolation));
+  }
 }
 
 Vector3 flipNormal(Vector3 n, Vector3 wo) {
