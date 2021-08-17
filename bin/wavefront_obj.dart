@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:web_gl';
 
 import 'package:vector_math/vector_math.dart';
 
